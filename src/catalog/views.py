@@ -6,8 +6,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import F, Q, Count, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic import DetailView, ListView
 
@@ -184,3 +185,41 @@ def vista_upload_imagem_selo(request: HttpRequest, pk: int) -> HttpResponse:
         messages.error(request, 'Nenhuma imagem foi fornecida.')
 
     return redirect('catalog:selo_detalhe', pk=pk)
+
+
+@login_required
+def vista_criar_pais(request: HttpRequest) -> HttpResponse:
+    """Cria um novo país/zona no catálogo via AJAX."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    nome = request.POST.get('nome', '').strip()
+    codigo_iso = request.POST.get('codigo_iso', '').strip().upper()
+    descricao = request.POST.get('descricao', '').strip()
+
+    if not nome or not codigo_iso:
+        return JsonResponse(
+            {'error': 'Nome e código ISO são obrigatórios.'},
+            status=400,
+        )
+
+    # Se já existir um país com este código, devolver o URL
+    existente = Pais.objects.filter(codigo_iso=codigo_iso).first()
+    if existente:
+        return JsonResponse({
+            'exists': True,
+            'url': reverse('catalog:pais_detalhe', kwargs={'pk': existente.pk}),
+            'nome': existente.nome,
+        })
+
+    pais = Pais.objects.create(
+        nome=nome,
+        codigo_iso=codigo_iso,
+        descricao=descricao,
+    )
+    return JsonResponse({
+        'created': True,
+        'url': reverse('catalog:pais_detalhe', kwargs={'pk': pais.pk}),
+        'nome': pais.nome,
+        'pk': pais.pk,
+    })

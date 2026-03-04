@@ -30,6 +30,61 @@
     box-shadow: 0 4px 12px rgba(0,0,0,.5);
 }
 .mapa-tooltip strong { color: #58a6ff; }
+/* ── Zoom controls ─────────────────────────────────────── */
+.mapa-zoom-controls {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+}
+.mapa-zoom-controls button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #161b22;
+    color: #e6edf3;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s;
+}
+.mapa-zoom-controls button:hover {
+    background: #21262d;
+}
+/* ── Map popup (click) ─────────────────────────────────── */
+.mapa-popup {
+    position: fixed;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 200px;
+    max-width: 260px;
+    z-index: 9999;
+    box-shadow: 0 8px 24px rgba(0,0,0,.6);
+    display: none;
+}
+.mapa-popup .popup-title {
+    font-weight: 600;
+    color: #e6edf3;
+    margin-bottom: 4px;
+}
+.mapa-popup .popup-info {
+    font-size: .8rem;
+    color: #8b949e;
+    margin-bottom: 10px;
+}
+.mapa-popup .popup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
 </style>
 {% endblock %}
 
@@ -45,6 +100,59 @@
 <div id="mapa-mundo">
     <svg id="svg-mapa"></svg>
     <div class="mapa-tooltip" id="mapa-tooltip"></div>
+    <div class="mapa-zoom-controls">
+        <button id="btn-zoom-in" title="Zoom in"><i class="bi bi-plus-lg"></i></button>
+        <button id="btn-zoom-out" title="Zoom out"><i class="bi bi-dash-lg"></i></button>
+        <button id="btn-zoom-reset" title="Reset"><i class="bi bi-arrows-fullscreen"></i></button>
+    </div>
+</div>
+
+<!-- Popup contextual do mapa -->
+<div class="mapa-popup" id="mapa-popup"></div>
+
+<!-- Modal para criar novo catálogo de país/zona -->
+<div class="modal fade" id="modal-criar-pais" tabindex="-1" aria-labelledby="modal-criar-pais-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background:#161b22;border-color:#30363d;color:#e6edf3;">
+            <div class="modal-header" style="border-color:#30363d;">
+                <h5 class="modal-title" id="modal-criar-pais-label">
+                    <i class="bi bi-plus-circle me-2"></i>Novo Catálogo
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-criar-pais">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="novo-pais-nome" class="form-label">Nome do País / Zona</label>
+                        <input type="text" class="form-control" id="novo-pais-nome" required
+                               placeholder="Ex.: Portugal – Açores">
+                    </div>
+                    <div class="mb-3">
+                        <label for="novo-pais-iso" class="form-label">Código ISO</label>
+                        <input type="text" class="form-control" id="novo-pais-iso" maxlength="10" required
+                               placeholder="Ex.: PT-AZ">
+                        <div class="form-text">
+                            Pode usar um código customizado (ex.: PT-AZ para Açores).
+                            Se o código já existir, será redirecionado para o catálogo existente.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="novo-pais-descricao" class="form-label">Descrição <span class="text-muted">(opcional)</span></label>
+                        <textarea class="form-control" id="novo-pais-descricao" rows="2"
+                                  placeholder="País antigo, zona especifica, etc."></textarea>
+                    </div>
+                    <div id="criar-pais-erro" class="alert alert-danger d-none"></div>
+                </form>
+            </div>
+            <div class="modal-footer" style="border-color:#30363d;">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn-criar-pais">
+                    <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Pesquisa reativa -->
@@ -137,19 +245,28 @@ if (inputPesquisa) {
     });
 }
 
-/* ═══ Mapa Mundial D3 ════════════════════════════════════════════ */
+/* ═══ Mapa Mundial D3 (com zoom, hover e criação de catálogo) ═══ */
 (async function buildMap() {
     const [worldData, isoData] = await Promise.all([
         d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
         d3.json('https://cdn.jsdelivr.net/npm/world-countries@4.0.0/countries.json').catch(() => []),
     ]);
 
-    // Construir mapeamento: ccn3 (numérico string) → dados do país
+    /* ── Mapeamento numérico ↔ ISO / nomes ────────────────────── */
     const numericByAlpha2 = {}, numericByAlpha3 = {};
+    const infoByNumeric = {};
+
     if (Array.isArray(isoData)) {
         isoData.forEach(c => {
             if (c.cca2 && c.ccn3) numericByAlpha2[c.cca2.toUpperCase()] = +c.ccn3;
             if (c.cca3 && c.ccn3) numericByAlpha3[c.cca3.toUpperCase()] = +c.ccn3;
+            if (c.ccn3) {
+                infoByNumeric[+c.ccn3] = {
+                    nome: c.name?.common || c.name?.official || '',
+                    iso2: (c.cca2 || '').toUpperCase(),
+                    iso3: (c.cca3 || '').toUpperCase(),
+                };
+            }
         });
     }
 
@@ -164,9 +281,10 @@ if (inputPesquisa) {
 
     const countries = topojson.feature(worldData, worldData.objects.countries);
 
-    const container  = document.getElementById('svg-mapa');
-    const W          = container.parentElement.offsetWidth || 900;
-    const H          = Math.round(W * 0.46);
+    /* ── SVG + projeção ───────────────────────────────────────── */
+    const container = document.getElementById('svg-mapa');
+    const W = container.parentElement.offsetWidth || 900;
+    const H = Math.round(W * 0.46);
 
     const svg = d3.select('#svg-mapa')
         .attr('viewBox', `0 0 ${W} ${H}`)
@@ -185,8 +303,11 @@ if (inputPesquisa) {
         .domain([1, maxCount])
         .interpolator(d3.interpolateBlues);
 
+    /* ── Grupo principal (zoom aplica-se aqui) ────────────────── */
+    const g = svg.append('g');
+
     // Graticule (fundo)
-    svg.append('path')
+    g.append('path')
         .datum(d3.geoGraticule()())
         .attr('d', geoPath)
         .attr('fill', 'none')
@@ -194,8 +315,10 @@ if (inputPesquisa) {
         .attr('stroke-width', 0.4);
 
     const tooltip = document.getElementById('mapa-tooltip');
+    const popup   = document.getElementById('mapa-popup');
 
-    svg.append('g')
+    /* ── Países ───────────────────────────────────────────────── */
+    g.append('g')
         .selectAll('path')
         .data(countries.features)
         .join('path')
@@ -207,14 +330,25 @@ if (inputPesquisa) {
         .attr('stroke', '#ffffff')
         .attr('stroke-width', 0.25)
         .attr('stroke-opacity', 0.4)
-        .style('cursor', d => byNumeric[+d.id] ? 'pointer' : 'default')
+        .style('cursor', 'pointer')
         .on('mousemove', function(event, d) {
-            const p = byNumeric[+d.id];
-            if (!p) return;
+            const p    = byNumeric[+d.id];
+            const info = infoByNumeric[+d.id];
+            const nome = p ? p.nome : (info ? info.nome : null);
+            if (!nome) return;
+
             tooltip.style.display = 'block';
             tooltip.style.left    = (event.clientX + 14) + 'px';
             tooltip.style.top     = (event.clientY - 40) + 'px';
-            tooltip.innerHTML     = `<strong>${p.nome}</strong><br><span style="color:#8b949e">${p.count} selos</span>`;
+
+            if (p && p.count > 0) {
+                tooltip.innerHTML = `<strong>${p.nome}</strong><br>`
+                    + `<span style="color:#8b949e">${p.count} selo${p.count !== 1 ? 's' : ''}</span>`;
+            } else {
+                tooltip.innerHTML = `<strong>${nome}</strong><br>`
+                    + `<span style="color:#8b949e">Sem catálogo</span>`;
+            }
+
             d3.select(this)
                 .attr('stroke', '#79c0ff')
                 .attr('stroke-width', 1.2)
@@ -228,13 +362,152 @@ if (inputPesquisa) {
                 .attr('stroke-opacity', 0.4);
         })
         .on('click', function(event, d) {
-            const p = byNumeric[+d.id];
-            if (p && p.url) window.location.href = p.url;
+            event.stopPropagation();
+            tooltip.style.display = 'none';
+            const p    = byNumeric[+d.id];
+            const info = infoByNumeric[+d.id];
+            showMapPopup(event, p, info);
         });
+
+    /* ── Zoom & Pan ───────────────────────────────────────────── */
+    const zoom = d3.zoom()
+        .scaleExtent([1, 12])
+        .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
+
+    svg.call(zoom);
+
+    // Disable double-click zoom (interferes with click)
+    svg.on('dblclick.zoom', null);
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+        svg.transition().duration(300).call(zoom.scaleBy, 1.5);
+    });
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+        svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
+    });
+    document.getElementById('btn-zoom-reset').addEventListener('click', () => {
+        svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+    });
+
+    /* ── Popup contextual ─────────────────────────────────────── */
+    function showMapPopup(event, catalogData, isoInfo) {
+        const nome = catalogData ? catalogData.nome
+            : (isoInfo ? isoInfo.nome : 'País desconhecido');
+        const iso  = catalogData ? catalogData.iso
+            : (isoInfo ? (isoInfo.iso2 || isoInfo.iso3) : '');
+
+        let html = `<div class="popup-title">${nome}</div>`;
+
+        if (catalogData && catalogData.count > 0) {
+            html += `<div class="popup-info">${catalogData.count} selo${catalogData.count !== 1 ? 's' : ''} no catálogo</div>`;
+            html += `<div class="popup-actions">`;
+            html += `<a href="${catalogData.url}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-eye me-1"></i>Ver Catálogo
+                     </a>`;
+            html += `<button class="btn btn-sm btn-outline-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}">
+                        <i class="bi bi-plus-lg me-1"></i>Criar Novo Catálogo
+                     </button>`;
+            html += `</div>`;
+        } else {
+            html += `<div class="popup-info">Sem catálogo</div>`;
+            html += `<div class="popup-actions">`;
+            html += `<button class="btn btn-sm btn-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}">
+                        <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
+                     </button>`;
+            html += `</div>`;
+        }
+
+        popup.innerHTML = html;
+        popup.style.display = 'block';
+        popup.style.left = (event.clientX + 10) + 'px';
+        popup.style.top  = (event.clientY + 10) + 'px';
+
+        // Ajustar se sair do ecrã
+        requestAnimationFrame(() => {
+            const r = popup.getBoundingClientRect();
+            if (r.right > window.innerWidth)
+                popup.style.left = (event.clientX - r.width - 10) + 'px';
+            if (r.bottom > window.innerHeight)
+                popup.style.top = (event.clientY - r.height - 10) + 'px';
+        });
+
+        // Ligar botão "Criar" dentro do popup
+        popup.querySelectorAll('[data-criar-nome]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                abrirModalCriarPais(btn.dataset.criarNome, btn.dataset.criarIso);
+            });
+        });
+    }
+
+    function escAttr(s) {
+        return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;');
+    }
+
+    function hideMapPopup() {
+        popup.style.display = 'none';
+    }
+
+    // Fechar popup ao clicar fora
+    document.addEventListener('click', (e) => {
+        if (!popup.contains(e.target)) hideMapPopup();
+    });
 
 })().catch(err => {
     console.warn('Mapa não carregado:', err);
     document.getElementById('mapa-mundo').style.display = 'none';
+});
+
+/* ═══ Modal – Criar novo catálogo ════════════════════════════════ */
+function abrirModalCriarPais(nome, iso) {
+    document.getElementById('novo-pais-nome').value = nome || '';
+    document.getElementById('novo-pais-iso').value  = iso || '';
+    document.getElementById('novo-pais-descricao').value = '';
+    document.getElementById('criar-pais-erro').classList.add('d-none');
+    document.getElementById('mapa-popup').style.display = 'none';
+    const modal = new bootstrap.Modal(document.getElementById('modal-criar-pais'));
+    modal.show();
+}
+
+document.getElementById('btn-criar-pais').addEventListener('click', async () => {
+    const nome     = document.getElementById('novo-pais-nome').value.trim();
+    const iso      = document.getElementById('novo-pais-iso').value.trim();
+    const descricao = document.getElementById('novo-pais-descricao').value.trim();
+    const erroEl   = document.getElementById('criar-pais-erro');
+
+    if (!nome || !iso) {
+        erroEl.textContent = 'Nome e código ISO são obrigatórios.';
+        erroEl.classList.remove('d-none');
+        return;
+    }
+
+    const csrfToken = document.querySelector('#form-criar-pais [name=csrfmiddlewaretoken]').value;
+
+    try {
+        const resp = await fetch('{% url "catalog:criar_pais" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+            },
+            body: new URLSearchParams({ nome, codigo_iso: iso, descricao }),
+        });
+
+        const data = await resp.json();
+
+        if (data.error) {
+            erroEl.textContent = data.error;
+            erroEl.classList.remove('d-none');
+            return;
+        }
+
+        // Redirecionar para o catálogo (novo ou existente)
+        window.location.href = data.url;
+    } catch (err) {
+        erroEl.textContent = 'Erro ao criar o catálogo. Tente novamente.';
+        erroEl.classList.remove('d-none');
+    }
 });
 </script>
 {% endblock %}

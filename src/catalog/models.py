@@ -8,10 +8,10 @@ class Pais(models.Model):
 
     nome = models.CharField(max_length=100, unique=True, verbose_name='Nome')
     codigo_iso = models.CharField(
-        max_length=3,
+        max_length=10,
         unique=True,
         verbose_name='Código ISO',
-        help_text='Código ISO 3166-1 alpha-2 ou alpha-3.',
+        help_text='Código ISO 3166-1 alpha-2/alpha-3, ou código customizado (ex.: PT-AZ).',
     )
     bandeira = models.ImageField(
         upload_to='bandeiras/',
