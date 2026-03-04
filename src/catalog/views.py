@@ -5,13 +5,13 @@ import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q, Count, QuerySet
+from django.db.models import F, Q, Count, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from django.views.generic import DetailView, ListView
 
-from .models import Pais, Selo, Tema, Variante
+from .models import Pais, Selo, Serie, Tema, Variante
 
 
 @method_decorator(login_required, name='dispatch')
@@ -68,7 +68,7 @@ class VistaPais(DetailView):
     def get_context_data(self, **kwargs) -> dict:
         """Filtra selos por pesquisa, tema e ano; adiciona paginação e IDs da coleção."""
         context = super().get_context_data(**kwargs)
-        selos = self.object.selos.prefetch_related('temas')
+        selos = self.object.selos.select_related('serie').prefetch_related('temas')
 
         # Lista de todos os anos disponíveis para este país (para a barra de navegação)
         anos_disponiveis = list(
@@ -92,6 +92,14 @@ class VistaPais(DetailView):
             selos = selos.filter(temas__id=tema_id)
         if ano:
             selos = selos.filter(ano=ano)
+
+        # Ordenação: ano, data de emissão da série (sem série no fim), valor
+        selos = selos.order_by(
+            'ano',
+            F('serie__data_emissao').asc(nulls_last=True),
+            F('serie__nome').asc(nulls_last=True),
+            'denominacao',
+        )
 
         # Paginação: 24 selos por página
         paginator = Paginator(selos, 24)
@@ -125,7 +133,7 @@ class VistaSeloDetalhe(DetailView):
     context_object_name = 'selo'
 
     def get_context_data(self, **kwargs) -> dict:
-        """Adiciona item de coleção e variantes possuídas ao contexto do selo."""
+        """Adiciona item de coleção, variantes e selos da mesma série ao contexto."""
         context = super().get_context_data(**kwargs)
 
         # Verifica se o utilizador tem este selo na coleção
@@ -144,9 +152,19 @@ class VistaSeloDetalhe(DetailView):
                 item_colecao.variantes_possuidas.values_list('id', flat=True)
             )
 
+        # Selos da mesma série (excluindo o atual)
+        selos_serie: QuerySet = Selo.objects.none()
+        if self.object.serie:
+            selos_serie = (
+                self.object.serie.selos
+                .exclude(pk=self.object.pk)
+                .order_by('denominacao')
+            )
+
         context['item_colecao'] = item_colecao
         context['variantes'] = variantes
         context['variantes_possuidas_ids'] = variantes_possuidas_ids
+        context['selos_serie'] = selos_serie
         return context
 
 

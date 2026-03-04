@@ -50,6 +50,48 @@ class Tema(models.Model):
         return self.nome
 
 
+class Serie(models.Model):
+    """Representa uma série / emissão (issue) de selos.
+
+    Uma série agrupa os selos emitidos em conjunto numa determinada data,
+    normalmente comemorando um evento ou tema comum.
+    """
+
+    pais = models.ForeignKey(
+        Pais,
+        on_delete=models.PROTECT,
+        related_name='series',
+        verbose_name='País',
+    )
+    nome = models.CharField(
+        max_length=200,
+        verbose_name='Nome da Série',
+        help_text='Nome da emissão / issue (ex.: «Ceres», «Route of the Portuguese Cathedrals»).',
+    )
+    data_emissao = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name='Data de Emissão',
+        help_text='Data em que a série foi emitida.',
+    )
+
+    class Meta:
+        verbose_name = 'Série'
+        verbose_name_plural = 'Séries'
+        ordering = ['pais', '-data_emissao', 'nome']
+        unique_together = [('pais', 'nome')]
+
+    def __str__(self) -> str:
+        if self.data_emissao:
+            return f'{self.nome} ({self.data_emissao:%Y-%m-%d})'
+        return self.nome
+
+    @property
+    def total_selos(self) -> int:
+        """Devolve o número total de selos desta série."""
+        return self.selos.count()
+
+
 class Selo(models.Model):
     """Representa um selo no catálogo."""
 
@@ -66,6 +108,15 @@ class Selo(models.Model):
         on_delete=models.PROTECT,
         related_name='selos',
         verbose_name='País',
+    )
+    serie = models.ForeignKey(
+        Serie,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='selos',
+        verbose_name='Série',
+        help_text='Série / emissão a que o selo pertence.',
     )
     temas = models.ManyToManyField(
         Tema,

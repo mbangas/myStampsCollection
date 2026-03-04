@@ -19,6 +19,7 @@ import os
 import re
 import sys
 import time
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Optional
@@ -33,7 +34,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "stamps_config.settings")
 django.setup()
 
-from catalog.models import Pais, Selo, Tema  # noqa: E402
+from catalog.models import Pais, Selo, Serie, Tema  # noqa: E402
 
 # ─── Constantes ───────────────────────────────────────────────────────────────
 BASE_URL = "https://www.stampdata.com"
@@ -489,12 +490,72 @@ def parse_tiragem(tiragem_raw: str) -> Optional[int]:
         return None
 
 
+def parse_data_emissao(data_raw: str) -> Optional[date]:
+    """Converte a data em bruto do StampData para date.
+
+    Formatos suportados:
+    - M/D/YYYY  → data completa
+    - M/YYYY    → assume dia 1 desse mês
+    - YYYY      → assume 1 de janeiro desse ano
+    """
+    if not data_raw:
+        return None
+    d = data_raw.strip()
+    try:
+        partes = d.split("/")
+        if len(partes) == 3:
+            mes, dia, ano = int(partes[0]), int(partes[1]), int(partes[2])
+            return date(ano, mes, dia)
+        if len(partes) == 2:
+            mes, ano = int(partes[0]), int(partes[1])
+            return date(ano, mes, 1)
+        if re.match(r"^\d{4}$", d):
+            return date(int(d), 1, 1)
+    except (ValueError, IndexError):
+        pass
+    return None
+
+
+def obter_ou_criar_serie(
+    nome_issue: str,
+    data_raw: str,
+    pais: Pais,
+    cache: dict[str, Serie],
+) -> Optional[Serie]:
+    """Obtém ou cria uma Série a partir do nome da issue.
+
+    Usa um dicionário-cache de sessão para evitar queries repetidas.
+    """
+    if not nome_issue:
+        return None
+
+    nome_issue = nome_issue.strip()[:200]
+    if nome_issue in cache:
+        return cache[nome_issue]
+
+    data_emissao = parse_data_emissao(data_raw)
+
+    serie, criada = Serie.objects.get_or_create(
+        pais=pais,
+        nome=nome_issue,
+        defaults={"data_emissao": data_emissao},
+    )
+    # Se já existia sem data e agora temos data, atualiza
+    if not criada and data_emissao and not serie.data_emissao:
+        serie.data_emissao = data_emissao
+        serie.save(update_fields=["data_emissao"])
+
+    cache[nome_issue] = serie
+    return serie
+
+
 def importar_selos(detalhes: list[dict], portugal: Pais) -> tuple[int, int, int]:
     """
     Importa os selos para a base de dados Django.
     Devolve (criados, atualizados, ignorados).
     """
     criados = atualizados = ignorados = 0
+    series_cache: dict[str, Serie] = {}
 
     for idx, dados in enumerate(detalhes, 1):
         if idx % 100 == 0:
@@ -519,6 +580,14 @@ def importar_selos(detalhes: list[dict], portugal: Pais) -> tuple[int, int, int]
         dentado = dados.get("dentado_raw", "")[:50]
         tiragem = parse_tiragem(dados.get("tiragem_raw", ""))
 
+        # Série / Emissão (issue)
+        serie = obter_ou_criar_serie(
+            dados.get("issue", ""),
+            dados.get("data_iso", ""),
+            portugal,
+            series_cache,
+        )
+
         try:
             selo, criado = Selo.objects.update_or_create(
                 pais=portugal,
@@ -532,6 +601,7 @@ def importar_selos(detalhes: list[dict], portugal: Pais) -> tuple[int, int, int]
                     "descricao_tecnica": descricao_tecnica,
                     "dentado": dentado,
                     "tiragem": tiragem,
+                    "serie": serie,
                 },
             )
 
@@ -611,7 +681,9 @@ def main() -> None:
     print(f"  ✓ Selos atualizados: {atualizados}")
     print(f"  ⚠ Selos ignorados:  {ignorados}")
     total_bd = Selo.objects.filter(pais=portugal).count()
+    total_series = Serie.objects.filter(pais=portugal).count()
     print(f"  → Total Portugal na BD: {total_bd}")
+    print(f"  → Total séries criadas: {total_series}")
     print("=" * 60)
 
 

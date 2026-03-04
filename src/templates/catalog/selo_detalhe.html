@@ -3,6 +3,57 @@
 
 {% block titulo %}{{ selo.titulo }} – Catálogo{% endblock %}
 
+{% block css_extra %}
+<style>
+/* ── Thumbnails da série ────────────────────────────────────── */
+.serie-thumbs-scroll {
+    display: flex;
+    gap: .75rem;
+    overflow-x: auto;
+    padding-bottom: .5rem;
+    scrollbar-width: thin;
+    scrollbar-color: #30363d transparent;
+}
+.serie-thumbs-scroll::-webkit-scrollbar { height: 5px; }
+.serie-thumbs-scroll::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+.serie-thumb-card {
+    flex: 0 0 auto;
+    width: 90px;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+    padding: 6px;
+    transition: background .15s;
+}
+.serie-thumb-card:hover {
+    background: rgba(88,166,255,.08);
+}
+.serie-thumb-img {
+    width: 78px;
+    height: 78px;
+    object-fit: contain;
+    border-radius: 6px;
+    border: 1px solid #30363d;
+    background: #161b22;
+}
+.serie-thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.serie-thumb-label {
+    display: block;
+    font-size: .65rem;
+    color: #8b949e;
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -69,6 +120,11 @@
         <p class="text-muted">
             <a href="{% url 'catalog:pais_detalhe' selo.pais.pk %}">{{ selo.pais.nome }}</a>
             · {{ selo.ano }}
+            {% if selo.serie %}
+            · <span style="color:#58a6ff;">
+                <i class="bi bi-collection me-1"></i>{{ selo.serie.nome }}
+              </span>
+            {% endif %}
         </p>
 
         {% if selo.temas.all %}
@@ -92,6 +148,16 @@
         <hr>
 
         <dl class="row small">
+            {% if selo.serie %}
+            <dt class="col-sm-4">Série / Emissão</dt>
+            <dd class="col-sm-8">
+                {{ selo.serie.nome }}
+                {% if selo.serie.data_emissao %}
+                    <span class="text-muted">({{ selo.serie.data_emissao|date:"d/m/Y" }})</span>
+                {% endif %}
+            </dd>
+            {% endif %}
+
             {% if selo.numero_mundifil %}
             <dt class="col-sm-4">Nº Mundifil</dt>
             <dd class="col-sm-8">{{ selo.numero_mundifil }}</dd>
@@ -157,5 +223,32 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Selos da mesma série -->
+{% if selos_serie %}
+<hr class="mt-4 mb-3">
+<h2 class="h6 text-uppercase text-muted mb-3">
+    <i class="bi bi-collection me-1"></i>
+    Outros selos da série «{{ selo.serie.nome }}»
+    <span class="badge" style="background:#21262d;color:#8b949e;font-size:.65rem;vertical-align:middle;">
+        {{ selos_serie|length }}
+    </span>
+</h2>
+<div class="serie-thumbs-scroll">
+    {% for s in selos_serie %}
+    <a href="{% url 'catalog:selo_detalhe' s.pk %}" class="serie-thumb-card" title="{{ s.titulo }} – {{ s.denominacao }} {{ s.moeda }}">
+        {% if s.imagem %}
+            <img src="{{ s.imagem.url }}" alt="{{ s.titulo }}" class="serie-thumb-img">
+        {% else %}
+            <div class="serie-thumb-img serie-thumb-placeholder">
+                <i class="bi bi-image" style="font-size:1.4rem;color:#6e7681;"></i>
+            </div>
+        {% endif %}
+        <span class="serie-thumb-label">{{ s.denominacao }} {{ s.moeda }}</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
 {% endblock %}
 
