@@ -15,7 +15,7 @@
 </nav>
 
 <div class="row g-4">
-    <!-- Imagem -->
+    <!-- Imagem + upload -->
     <div class="col-md-4 text-center">
         {% if selo.imagem %}
             <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
@@ -27,8 +27,21 @@
             </div>
         {% endif %}
 
+        <!-- Upload de imagem -->
+        <form method="post" action="{% url 'catalog:upload_imagem_selo' selo.pk %}"
+              enctype="multipart/form-data" class="mt-3" id="form-upload-imagem">
+            {% csrf_token %}
+            <label for="input-imagem" class="btn btn-outline-secondary btn-sm w-100 mb-1">
+                <i class="bi bi-camera me-1"></i>
+                {% if selo.imagem %}Substituir foto{% else %}Adicionar foto{% endif %}
+            </label>
+            <input type="file" id="input-imagem" name="imagem"
+                   accept="image/*" class="d-none"
+                   onchange="document.getElementById('form-upload-imagem').submit()">
+        </form>
+
         <!-- Botão coleção -->
-        <div class="mt-3">
+        <div class="mt-2">
             {% if item_colecao %}
                 <div class="alert alert-success py-2 mb-2">
                     <i class="bi bi-check-circle me-1"></i>
@@ -79,6 +92,11 @@
         <hr>
 
         <dl class="row small">
+            {% if selo.numero_mundifil %}
+            <dt class="col-sm-4">Nº Mundifil</dt>
+            <dd class="col-sm-8">{{ selo.numero_mundifil }}</dd>
+            {% endif %}
+
             <dt class="col-sm-4">Nº de Catálogo</dt>
             <dd class="col-sm-8">{{ selo.numero_catalogo }}</dd>
 
@@ -91,10 +109,53 @@
             {% endif %}
 
             {% if selo.tiragem %}
-            <dt class="col-sm-4">Tiragem</dt>
+            <dt class="col-sm-4">Nº de Exemplares Emitidos</dt>
             <dd class="col-sm-8">{{ selo.tiragem|intcomma }}</dd>
             {% endif %}
         </dl>
+
+        <!-- Variantes conhecidas -->
+        {% if variantes %}
+        <hr>
+        <h2 class="h6 text-uppercase text-muted mb-2">Variantes Conhecidas</h2>
+        <table class="table table-sm small">
+            <thead>
+                <tr>
+                    <th>Variante</th>
+                    <th>Descrição</th>
+                    <th class="text-center">Na coleção</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for variante in variantes %}
+                <tr>
+                    <td class="fw-semibold">{{ variante.codigo }}</td>
+                    <td class="text-muted">{{ variante.descricao|default:"—" }}</td>
+                    <td class="text-center">
+                        {% if variante.pk in variantes_possuidas_ids %}
+                        <span title="Tens esta variante" style="color:#3fb950;">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+                                 xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="8" cy="8" r="7" fill="#238636" stroke="#2ea043" stroke-width="1"/>
+                                <polyline points="4.5,8.5 7,11 11.5,5.5"
+                                          stroke="#fff" stroke-width="1.8"
+                                          stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        {% else %}
+                        <span style="color:#6e7681;" title="Não tens esta variante">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <circle cx="8" cy="8" r="7" stroke="#30363d" stroke-width="1"/>
+                            </svg>
+                        </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
+

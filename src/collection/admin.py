@@ -11,8 +11,8 @@ class ItemColecaoAdmin(admin.ModelAdmin):
 
     list_display = (
         'utilizador', 'stamp', 'quantidade_possuida',
-        'quantidade_repetidos', 'condicao', 'data_adicao',
+        'quantidade_repetidos', 'condicao', 'localizacao', 'data_adicao',
     )
     list_filter = ('condicao', 'stamp__pais')
-    search_fields = ('utilizador__username', 'stamp__titulo')
+    search_fields = ('utilizador__username', 'stamp__titulo', 'localizacao')
     readonly_fields = ('data_adicao', 'data_atualizacao')

@@ -2,6 +2,37 @@
 
 {% block titulo %}Catálogo – Selos do Mundo{% endblock %}
 
+{% block css_extra %}
+<style>
+#mapa-mundo {
+    width: 100%;
+    background: #000;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 1.5rem;
+    min-height: 200px;
+}
+#mapa-mundo svg { display: block; width: 100%; }
+.mapa-tooltip {
+    position: fixed;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #e6edf3;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: nowrap;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,.5);
+}
+.mapa-tooltip strong { color: #58a6ff; }
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <div class="page-header">
     <h1><i class="bi bi-globe2 me-2"></i>Catálogo por País</h1>
@@ -10,11 +41,17 @@
     </a>
 </div>
 
-<!-- Pesquisa -->
-<form method="get" class="mb-4">
+<!-- Mapa do mundo -->
+<div id="mapa-mundo">
+    <svg id="svg-mapa"></svg>
+    <div class="mapa-tooltip" id="mapa-tooltip"></div>
+</div>
+
+<!-- Pesquisa reativa -->
+<form method="get" class="mb-4" id="form-pesquisa" autocomplete="off">
     <div class="input-group">
-        <input type="text" name="q" value="{{ pesquisa }}" class="form-control"
-               placeholder="Pesquisar país…">
+        <input type="text" name="q" id="input-pesquisa" value="{{ pesquisa }}"
+               class="form-control" placeholder="Pesquisar país…">
         <button class="btn btn-primary" type="submit">
             <i class="bi bi-search"></i>
         </button>
@@ -26,6 +63,8 @@
     </div>
 </form>
 
+<p class="text-muted small mb-3" id="contador-resultados" style="display:none;"></p>
+
 {% if pesquisa %}
 <p class="text-muted small">
     {{ paises|length }} resultado(s) para "<strong>{{ pesquisa }}</strong>"
@@ -33,9 +72,9 @@
 {% endif %}
 
 <!-- Grelha de países -->
-<div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+<div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3" id="grelha-paises">
     {% for pais in paises %}
-    <div class="col">
+    <div class="col pais-item" data-nome="{{ pais.nome|lower }}">
         <a href="{% url 'catalog:pais_detalhe' pais.pk %}"
            class="card h-100 text-decoration-none card-pais {% if pais.id in paises_interesse %}border-primary{% endif %}">
             <div class="card-body text-center p-3">
@@ -63,4 +102,139 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- Dados do servidor para o mapa -->
+<script>const PAISES_DATA = {{ paises_json|safe }};</script>
+{% endblock %}
+
+{% block js_extra %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script>
+/* ═══ Pesquisa reativa ═══════════════════════════════════════════ */
+const inputPesquisa   = document.getElementById('input-pesquisa');
+const contadorEl      = document.getElementById('contador-resultados');
+
+function normStr(s) {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+if (inputPesquisa) {
+    inputPesquisa.addEventListener('input', () => {
+        const q = normStr(inputPesquisa.value.trim());
+        let visivel = 0;
+        document.querySelectorAll('.pais-item').forEach(item => {
+            const match = !q || normStr(item.dataset.nome).includes(q);
+            item.style.display = match ? '' : 'none';
+            if (match) visivel++;
+        });
+        if (q) {
+            contadorEl.style.display = '';
+            contadorEl.textContent = `${visivel} resultado(s) para "${inputPesquisa.value.trim()}"`;
+        } else {
+            contadorEl.style.display = 'none';
+        }
+    });
+}
+
+/* ═══ Mapa Mundial D3 ════════════════════════════════════════════ */
+(async function buildMap() {
+    const [worldData, isoData] = await Promise.all([
+        d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
+        d3.json('https://cdn.jsdelivr.net/npm/world-countries@4.0.0/countries.json').catch(() => []),
+    ]);
+
+    // Construir mapeamento: ccn3 (numérico string) → dados do país
+    const numericByAlpha2 = {}, numericByAlpha3 = {};
+    if (Array.isArray(isoData)) {
+        isoData.forEach(c => {
+            if (c.cca2 && c.ccn3) numericByAlpha2[c.cca2.toUpperCase()] = +c.ccn3;
+            if (c.cca3 && c.ccn3) numericByAlpha3[c.cca3.toUpperCase()] = +c.ccn3;
+        });
+    }
+
+    const byNumeric = {};
+    PAISES_DATA.forEach(p => {
+        const code = p.iso.toUpperCase();
+        const num = code.length === 2
+            ? numericByAlpha2[code]
+            : numericByAlpha3[code];
+        if (num) byNumeric[num] = p;
+    });
+
+    const countries = topojson.feature(worldData, worldData.objects.countries);
+
+    const container  = document.getElementById('svg-mapa');
+    const W          = container.parentElement.offsetWidth || 900;
+    const H          = Math.round(W * 0.46);
+
+    const svg = d3.select('#svg-mapa')
+        .attr('viewBox', `0 0 ${W} ${H}`)
+        .attr('width', W)
+        .attr('height', H)
+        .style('background', '#000');
+
+    const projection = d3.geoNaturalEarth1()
+        .scale(W / 6.3)
+        .translate([W / 2, H / 2]);
+
+    const geoPath = d3.geoPath().projection(projection);
+
+    const maxCount = d3.max(PAISES_DATA, d => d.count) || 1;
+    const colorScale = d3.scaleSequentialSqrt()
+        .domain([1, maxCount])
+        .interpolator(d3.interpolateBlues);
+
+    // Graticule (fundo)
+    svg.append('path')
+        .datum(d3.geoGraticule()())
+        .attr('d', geoPath)
+        .attr('fill', 'none')
+        .attr('stroke', '#111')
+        .attr('stroke-width', 0.4);
+
+    const tooltip = document.getElementById('mapa-tooltip');
+
+    svg.append('g')
+        .selectAll('path')
+        .data(countries.features)
+        .join('path')
+        .attr('d', geoPath)
+        .attr('fill', d => {
+            const p = byNumeric[+d.id];
+            return (p && p.count > 0) ? colorScale(p.count) : '#1a1a1a';
+        })
+        .attr('stroke', '#ffffff')
+        .attr('stroke-width', 0.25)
+        .attr('stroke-opacity', 0.4)
+        .style('cursor', d => byNumeric[+d.id] ? 'pointer' : 'default')
+        .on('mousemove', function(event, d) {
+            const p = byNumeric[+d.id];
+            if (!p) return;
+            tooltip.style.display = 'block';
+            tooltip.style.left    = (event.clientX + 14) + 'px';
+            tooltip.style.top     = (event.clientY - 40) + 'px';
+            tooltip.innerHTML     = `<strong>${p.nome}</strong><br><span style="color:#8b949e">${p.count} selos</span>`;
+            d3.select(this)
+                .attr('stroke', '#79c0ff')
+                .attr('stroke-width', 1.2)
+                .attr('stroke-opacity', 1);
+        })
+        .on('mouseleave', function() {
+            tooltip.style.display = 'none';
+            d3.select(this)
+                .attr('stroke', '#ffffff')
+                .attr('stroke-width', 0.25)
+                .attr('stroke-opacity', 0.4);
+        })
+        .on('click', function(event, d) {
+            const p = byNumeric[+d.id];
+            if (p && p.url) window.location.href = p.url;
+        });
+
+})().catch(err => {
+    console.warn('Mapa não carregado:', err);
+    document.getElementById('mapa-mundo').style.display = 'none';
+});
+</script>
 {% endblock %}

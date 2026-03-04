@@ -1,13 +1,16 @@
 """Vistas da aplicação Catálogo."""
 
+import json
+
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q, Count
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from django.views.generic import DetailView, ListView
 
-from .models import Pais, Selo, Tema
+from .models import Pais, Selo, Tema, Variante
 
 
 @method_decorator(login_required, name='dispatch')
@@ -19,7 +22,6 @@ class VistaCatalogo(ListView):
 
     def get_queryset(self):
         queryset = Pais.objects.annotate(num_selos=Count('selos'))
-        paises_interesse = self.request.user.perfil.paises_interesse.values_list('id', flat=True)
 
         # Filtragem por pesquisa
         pesquisa = self.request.GET.get('q', '').strip()
@@ -35,6 +37,20 @@ class VistaCatalogo(ListView):
             self.request.user.perfil.paises_interesse.values_list('id', flat=True)
         )
         context['temas'] = Tema.objects.all()
+
+        # JSON para o mapa D3 (todos os países, independente do filtro de pesquisa)
+        todos_paises = Pais.objects.annotate(num_selos=Count('selos'))
+        paises_map_data = [
+            {
+                'iso': p.codigo_iso,
+                'nome': p.nome,
+                'count': p.num_selos,
+                'url': f'/catalogo/pais/{p.pk}/',
+                'pk': p.pk,
+            }
+            for p in todos_paises
+        ]
+        context['paises_json'] = json.dumps(paises_map_data)
         return context
 
 
@@ -115,5 +131,33 @@ class VistaSeloDetalhe(DetailView):
         except ItemColecao.DoesNotExist:
             pass
 
+        # Variantes conhecidas + quais o utilizador possui
+        variantes = self.object.variantes.all()
+        variantes_possuidas_ids = set()
+        if item_colecao:
+            variantes_possuidas_ids = set(
+                item_colecao.variantes_possuidas.values_list('id', flat=True)
+            )
+
         context['item_colecao'] = item_colecao
+        context['variantes'] = variantes
+        context['variantes_possuidas_ids'] = variantes_possuidas_ids
         return context
+
+
+@login_required
+def vista_upload_imagem_selo(request, pk: int):
+    """Upload ou substituição de imagem de um selo do catálogo."""
+    selo = get_object_or_404(Selo, pk=pk)
+
+    if request.method == 'POST' and request.FILES.get('imagem'):
+        # Remove imagem anterior se existir
+        if selo.imagem:
+            selo.imagem.delete(save=False)
+        selo.imagem = request.FILES['imagem']
+        selo.save(update_fields=['imagem'])
+        messages.success(request, 'Imagem do selo atualizada com sucesso.')
+    else:
+        messages.error(request, 'Nenhuma imagem foi fornecida.')
+
+    return redirect('catalog:selo_detalhe', pk=pk)

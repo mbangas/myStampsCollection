@@ -2,6 +2,52 @@
 
 {% block titulo %}A Minha Coleção – Selos do Mundo{% endblock %}
 
+{% block css_extra %}
+<style>
+/* ── Bulk action bar ────────────────────────────────────────── */
+#bulk-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #1f6feb;
+    color: #fff;
+    padding: .75rem 1.5rem;
+    display: none;
+    align-items: center;
+    gap: 1rem;
+    z-index: 1040;
+    box-shadow: 0 -4px 16px rgba(0,0,0,.4);
+    flex-wrap: wrap;
+}
+#bulk-bar.visivel { display: flex; }
+#bulk-bar input[type="text"] {
+    background: rgba(255,255,255,.15);
+    border: 1px solid rgba(255,255,255,.3);
+    color: #fff;
+    border-radius: 6px;
+    padding: .3rem .65rem;
+    font-size: .875rem;
+    flex: 1;
+    min-width: 180px;
+    max-width: 260px;
+}
+#bulk-bar input[type="text"]::placeholder { color: rgba(255,255,255,.6); }
+#bulk-bar input[type="text"]:focus { outline: none; border-color: rgba(255,255,255,.8); }
+.badge-localizacao {
+    background: rgba(31,111,235,.2);
+    border: 1px solid rgba(88,166,255,.35);
+    color: #79c0ff;
+    border-radius: 4px;
+    font-size: .7rem;
+    padding: .15em .45em;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+}
+/* Estilos das linhas selecionadas */
+tr.selecionado { background: rgba(31,111,235,.07) !important; }
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <div class="page-header">
     <h1><i class="bi bi-collection me-2"></i>A Minha Coleção</h1>
@@ -89,25 +135,36 @@
 {% regroup itens by stamp.pais.nome as grupos %}
 {% for grupo in grupos %}
 <div class="mb-4">
-    <div class="section-label">
-        <i class="bi bi-flag"></i> {{ grupo.grouper }}
+    <div class="section-label d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-flag"></i> {{ grupo.grouper }}</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm py-0"
+                onclick="selecionarGrupo(this)" style="font-size:.72rem;">
+            Selecionar todos
+        </button>
     </div>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
             <thead>
                 <tr>
+                    <th style="width:32px;"></th>
                     <th style="width:60px;"></th>
                     <th>Selo</th>
                     <th class="text-center">Ano</th>
                     <th class="text-center">Qtd.</th>
                     <th class="text-center">Repetidos</th>
                     <th>Condição</th>
+                    <th>Localização</th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in grupo.list %}
-                <tr>
+                <tr data-pk="{{ item.pk }}">
+                    <td>
+                        <input type="checkbox" class="form-check-input item-check"
+                               value="{{ item.pk }}"
+                               onchange="atualizarSelecao()">
+                    </td>
                     <td>
                         {% if item.stamp.imagem %}
                             <img src="{{ item.stamp.imagem.url }}" alt="{{ item.stamp.titulo }}"
@@ -124,6 +181,11 @@
                             {{ item.stamp.titulo }}
                         </a>
                         <small class="text-muted d-block">Nº {{ item.stamp.numero_catalogo }}</small>
+                        {% if item.notas %}
+                        <small class="text-muted d-block fst-italic" title="{{ item.notas }}">
+                            <i class="bi bi-chat-left-text me-1"></i>{{ item.notas|truncatechars:40 }}
+                        </small>
+                        {% endif %}
                     </td>
                     <td class="text-center">{{ item.stamp.ano }}</td>
                     <td class="text-center">{{ item.quantidade_possuida }}</td>
@@ -136,6 +198,15 @@
                     </td>
                     <td>
                         <span class="badge bg-secondary">{{ item.get_condicao_display }}</span>
+                    </td>
+                    <td>
+                        {% if item.localizacao %}
+                        <span class="badge-localizacao">
+                            <i class="bi bi-tag" style="font-size:.65rem;"></i>{{ item.localizacao }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted" style="font-size:.75rem;">—</span>
+                        {% endif %}
                     </td>
                     <td class="text-end">
                         <a href="{% url 'collection:editar_item' item.pk %}"
@@ -196,4 +267,61 @@
     </p>
 </nav>
 {% endif %}
+
+<!-- Barra de ação em massa (localização) -->
+<form id="bulk-bar" method="post" action="{% url 'collection:atualizar_localizacao_bulk' %}">
+    {% csrf_token %}
+    <span id="bulk-count" style="white-space:nowrap;font-weight:600;"></span>
+    <span style="font-size:.85rem; opacity:.85;">localização:</span>
+    <input type="text" name="localizacao" id="bulk-localizacao"
+           placeholder="Ex.: Álbum A, Caixa 3…" required>
+    <input type="hidden" name="itens" id="bulk-itens-input">
+    <button type="submit" class="btn btn-sm"
+            style="background:#fff;color:#1f6feb;font-weight:600;border:none;padding:.3rem .8rem;">
+        <i class="bi bi-tag me-1"></i> Aplicar
+    </button>
+    <button type="button" class="btn btn-sm"
+            style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);"
+            onclick="limparSelecao()">
+        <i class="bi bi-x-lg"></i> Cancelar
+    </button>
+</form>
+{% endblock %}
+
+{% block js_extra %}
+<script>
+const bulkBar        = document.getElementById('bulk-bar');
+const bulkCount      = document.getElementById('bulk-count');
+const bulkItensInput = document.getElementById('bulk-itens-input');
+
+function atualizarSelecao() {
+    const selecionados = [...document.querySelectorAll('.item-check:checked')].map(c => c.value);
+    document.querySelectorAll('tr[data-pk]').forEach(tr => {
+        tr.classList.toggle('selecionado', selecionados.includes(tr.dataset.pk));
+    });
+    if (selecionados.length > 0) {
+        bulkCount.textContent = `${selecionados.length} selos selecionados —`;
+        bulkItensInput.value  = selecionados.join(',');
+        bulkBar.classList.add('visivel');
+    } else {
+        bulkBar.classList.remove('visivel');
+    }
+}
+
+function limparSelecao() {
+    document.querySelectorAll('.item-check').forEach(c => c.checked = false);
+    document.querySelectorAll('tr[data-pk]').forEach(tr => tr.classList.remove('selecionado'));
+    bulkBar.classList.remove('visivel');
+}
+
+function selecionarGrupo(btn) {
+    const tabela = btn.closest('.mb-4').querySelector('tbody');
+    if (!tabela) return;
+    const checks = [...tabela.querySelectorAll('.item-check')];
+    const todasSelecionadas = checks.every(c => c.checked);
+    checks.forEach(c => { c.checked = !todasSelecionadas; });
+    btn.textContent = todasSelecionadas ? 'Selecionar todos' : 'Desselecionar todos';
+    atualizarSelecao();
+}
+</script>
 {% endblock %}

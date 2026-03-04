@@ -106,6 +106,12 @@ class Selo(models.Model):
         blank=True,
         verbose_name='Tiragem',
     )
+    numero_mundifil = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name='Nº Mundifil',
+        help_text='Referência no catálogo Mundifil.',
+    )
     imagem = models.ImageField(
         upload_to='selos/',
         blank=True,
@@ -123,3 +129,24 @@ class Selo(models.Model):
 
     def __str__(self) -> str:
         return f'{self.pais.nome} – {self.titulo} ({self.ano})'
+
+
+class Variante(models.Model):
+    """Representa uma variante conhecida de um selo (ex.: cor, papel, dentado)."""
+
+    selo = models.ForeignKey(
+        Selo,
+        on_delete=models.CASCADE,
+        related_name='variantes',
+        verbose_name='Selo',
+    )
+    codigo = models.CharField(max_length=50, verbose_name='Código / Designação')
+    descricao = models.TextField(blank=True, verbose_name='Descrição')
+
+    class Meta:
+        verbose_name = 'Variante'
+        verbose_name_plural = 'Variantes'
+        ordering = ['codigo']
+
+    def __str__(self) -> str:
+        return f'{self.selo} – {self.codigo}'

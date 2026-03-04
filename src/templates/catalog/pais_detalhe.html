@@ -2,6 +2,122 @@
 
 {% block titulo %}{{ pais.nome }} – Catálogo{% endblock %}
 
+{% block css_extra %}
+<style>
+/* ── Layout com timeline lateral ────────────────────────────── */
+.pais-layout {
+    display: grid;
+    grid-template-columns: 68px 1fr;
+    gap: 0 1.25rem;
+    align-items: start;
+}
+@media (max-width: 768px) {
+    .pais-layout {
+        grid-template-columns: 1fr;
+    }
+    .ano-timeline { display: none; }
+}
+
+/* ── Timeline lateral (Google Photos style) ─────────────────── */
+.ano-timeline {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #30363d transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+    gap: 0;
+}
+.ano-timeline::-webkit-scrollbar { width: 4px; }
+.ano-timeline::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+.ano-btn {
+    writing-mode: horizontal-tb;
+    font-size: .7rem;
+    font-weight: 500;
+    color: #6e7681;
+    padding: 3px 0;
+    width: 100%;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-radius: 4px;
+    transition: color .12s, background .12s;
+    line-height: 1.4;
+    letter-spacing: .02em;
+}
+.ano-btn:hover { color: #58a6ff; background: rgba(88,166,255,.08); }
+.ano-btn.active {
+    color: #fff;
+    font-weight: 700;
+    background: rgba(88,166,255,.18);
+}
+.ano-timeline-line {
+    width: 1px;
+    flex: 1;
+    min-height: 6px;
+    background: #21262d;
+    margin: 0 auto;
+}
+
+/* ── Card com checkmark em vez de borda ─────────────────────── */
+.card-selo-colecao {
+    position: relative;
+}
+.card-selo-colecao .checkmark-colecao {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #238636;
+    border: 2px solid #2ea043;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+.card-selo-colecao .checkmark-colecao svg {
+    width: 11px;
+    height: 11px;
+    stroke: #fff;
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ── Botão voltar ao topo ────────────────────────────────────── */
+#btn-topo {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1f6feb;
+    border: 1px solid rgba(240,246,252,.12);
+    color: #fff;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1020;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    transition: background .15s, opacity .15s;
+}
+#btn-topo:hover { background: #388bfd; }
+#btn-topo.visivel { display: flex; }
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
@@ -59,26 +175,6 @@
     </div>
 </form>
 
-<!-- Barra de navegação por ano -->
-{% if anos %}
-<div class="anos-nav">
-    <a href="?q={{ pesquisa }}&tema={{ tema_selecionado }}"
-       class="{% if not ano_selecionado %}active{% endif %}">
-        Todos
-    </a>
-    {% for a in anos %}
-        {% if ano_selecionado %}
-        <a href="?ano={{ a }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
-           class="{% if a|stringformat:'s' == ano_selecionado %}active{% endif %}">
-            {{ a }}
-        </a>
-        {% else %}
-        <a href="#ano-{{ a }}" class="anos-nav-anchor">{{ a }}</a>
-        {% endif %}
-    {% endfor %}
-</div>
-{% endif %}
-
 <!-- Contador -->
 <p class="text-muted small mb-3">
     {% if pagina.paginator.count == 0 %}
@@ -90,91 +186,171 @@
     {% endif %}
 </p>
 
-<!-- Grelha de selos agrupada por ano -->
-{% regroup selos by ano as grupos_ano %}
-{% for grupo in grupos_ano %}
+<!-- Layout: timeline + selos -->
+<div class="pais-layout">
 
-<div id="ano-{{ grupo.grouper }}" class="mb-2">
-    <div class="d-flex align-items-center gap-2 mb-3" style="border-bottom:1px solid #21262d;padding-bottom:.35rem;">
-        <span style="font-size:.7rem;font-weight:600;letter-spacing:.08em;color:#8b949e;text-transform:uppercase;">{{ grupo.grouper }}</span>
-        <span class="badge" style="background:#21262d;color:#8b949e;font-size:.65rem;">{{ grupo.list|length }} selo{{ grupo.list|length|pluralize }}</span>
-    </div>
-    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
-        {% for selo in grupo.list %}
-        <div class="col">
-            <div class="card h-100 card-selo {% if selo.pk in ids_colecao %}border-success{% endif %}">
-                <a href="{% url 'catalog:selo_detalhe' selo.pk %}">
-                    {% if selo.imagem %}
-                        <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
-                             class="card-img-top img-selo">
-                    {% else %}
-                        <div class="card-img-top img-selo-placeholder d-flex align-items-center
-                                    justify-content-center">
-                            <i class="bi bi-image text-secondary fs-1"></i>
+    <!-- ── Timeline lateral de anos ── -->
+    {% if anos %}
+    <nav class="ano-timeline" id="ano-timeline" aria-label="Navegação por ano">
+        {% for a in anos %}
+        {% if not forloop.first %}
+            <div class="ano-timeline-line"></div>
+        {% endif %}
+        <button
+            class="ano-btn {% if a|stringformat:'s' == ano_selecionado %}active{% endif %}"
+            data-ano="{{ a }}"
+            data-href="?ano={{ a }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
+            onclick="window.location.href=this.dataset.href"
+            title="{{ a }}">
+            {{ a }}
+        </button>
+        {% endfor %}
+    </nav>
+    {% endif %}
+
+    <!-- ── Grelha de selos ── -->
+    <div>
+        {% regroup selos by ano as grupos_ano %}
+        {% for grupo in grupos_ano %}
+
+        <div id="ano-{{ grupo.grouper }}" class="mb-2">
+            <div class="d-flex align-items-center gap-2 mb-3"
+                 style="border-bottom:1px solid #21262d;padding-bottom:.35rem;">
+                <span style="font-size:.7rem;font-weight:600;letter-spacing:.08em;color:#8b949e;text-transform:uppercase;">
+                    {{ grupo.grouper }}
+                </span>
+                <span class="badge" style="background:#21262d;color:#8b949e;font-size:.65rem;">
+                    {{ grupo.list|length }} selo{{ grupo.list|length|pluralize }}
+                </span>
+            </div>
+            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
+                {% for selo in grupo.list %}
+                <div class="col">
+                    <div class="card h-100 card-selo card-selo-colecao">
+                        {% if selo.pk in ids_colecao %}
+                        <div class="checkmark-colecao" title="Na tua coleção">
+                            <svg viewBox="0 0 12 12">
+                                <polyline points="1.5,6 5,9.5 10.5,3"/>
+                            </svg>
                         </div>
-                    {% endif %}
-                </a>
-                <div class="card-body p-2">
-                    <p class="card-text small mb-1 fw-semibold">{{ selo.titulo }}</p>
-                    <p class="card-text text-muted" style="font-size:.75rem;">
-                        {{ selo.denominacao }} {{ selo.moeda }}
-                    </p>
-                    <p class="card-text text-muted" style="font-size:.7rem;">
-                        Nº {{ selo.numero_catalogo }}
-                    </p>
-                </div>
-                <div class="card-footer p-2 d-flex gap-1">
-                    {% if selo.pk in ids_colecao %}
-                        <span class="badge bg-success w-100 text-center">
-                            <i class="bi bi-check me-1"></i>Tenho
-                        </span>
-                    {% else %}
-                        <a href="{% url 'collection:adicionar_selo' selo.pk %}"
-                           class="btn btn-outline-primary btn-sm w-100">
-                            <i class="bi bi-plus"></i> Adicionar
+                        {% endif %}
+                        <a href="{% url 'catalog:selo_detalhe' selo.pk %}">
+                            {% if selo.imagem %}
+                                <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
+                                     class="card-img-top img-selo">
+                            {% else %}
+                                <div class="card-img-top img-selo-placeholder d-flex align-items-center
+                                            justify-content-center">
+                                    <i class="bi bi-image text-secondary fs-1"></i>
+                                </div>
+                            {% endif %}
                         </a>
-                    {% endif %}
+                        <div class="card-body p-2">
+                            <p class="card-text small mb-1 fw-semibold">{{ selo.titulo }}</p>
+                            <p class="card-text text-muted" style="font-size:.75rem;">
+                                {{ selo.denominacao }} {{ selo.moeda }}
+                            </p>
+                            <p class="card-text text-muted" style="font-size:.7rem;">
+                                Nº {{ selo.numero_catalogo }}
+                            </p>
+                        </div>
+                        <div class="card-footer p-2 d-flex gap-1">
+                            {% if selo.pk in ids_colecao %}
+                                <a href="{% url 'catalog:selo_detalhe' selo.pk %}"
+                                   class="btn btn-outline-secondary btn-sm w-100">
+                                    <i class="bi bi-eye me-1"></i>Ver
+                                </a>
+                            {% else %}
+                                <a href="{% url 'collection:adicionar_selo' selo.pk %}"
+                                   class="btn btn-outline-primary btn-sm w-100">
+                                    <i class="bi bi-plus"></i> Adicionar
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
         </div>
-        {% endfor %}
-    </div>
-</div>
 
-{% empty %}
-<p class="text-muted">Nenhum selo encontrado.</p>
-{% endfor %}
-
-<!-- Paginação -->
-{% if pagina.has_other_pages %}
-<nav class="mt-4" aria-label="Paginação">
-    <ul class="pagination justify-content-center flex-wrap">
-        {% if pagina.has_previous %}
-        <li class="page-item">
-            <a class="page-link" href="?pagina={{ pagina.previous_page_number }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">
-                <i class="bi bi-chevron-left"></i>
-            </a>
-        </li>
-        {% endif %}
-        {% for num in pagina.paginator.page_range %}
-            {% if pagina.number == num %}
-            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
-            {% elif num > pagina.number|add:"-4" and num < pagina.number|add:"4" %}
-            <li class="page-item">
-                <a class="page-link" href="?pagina={{ num }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">{{ num }}</a>
-            </li>
-            {% endif %}
+        {% empty %}
+        <p class="text-muted">Nenhum selo encontrado.</p>
         {% endfor %}
-        {% if pagina.has_next %}
-        <li class="page-item">
-            <a class="page-link" href="?pagina={{ pagina.next_page_number }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">
-                <i class="bi bi-chevron-right"></i>
-            </a>
-        </li>
+
+        <!-- Paginação -->
+        {% if pagina.has_other_pages %}
+        <nav class="mt-4" aria-label="Paginação">
+            <ul class="pagination justify-content-center flex-wrap">
+                {% if pagina.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?pagina={{ pagina.previous_page_number }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                {% for num in pagina.paginator.page_range %}
+                    {% if pagina.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > pagina.number|add:"-4" and num < pagina.number|add:"4" %}
+                    <li class="page-item">
+                        <a class="page-link" href="?pagina={{ num }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                {% if pagina.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?pagina={{ pagina.next_page_number }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
         {% endif %}
-    </ul>
-</nav>
-{% endif %}
+    </div><!-- /grelha -->
+
+</div><!-- /pais-layout -->
+
+<!-- Botão voltar ao topo -->
+<button id="btn-topo" title="Voltar ao topo" aria-label="Voltar ao topo">
+    <i class="bi bi-chevron-up"></i>
+</button>
 
 {% endblock %}
 
+{% block js_extra %}
+<script>
+/* ── Botão voltar ao topo ────────────────────────────────────── */
+const btnTopo = document.getElementById('btn-topo');
+window.addEventListener('scroll', () => {
+    if (window.scrollY > 300) btnTopo.classList.add('visivel');
+    else btnTopo.classList.remove('visivel');
+}, { passive: true });
+btnTopo.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+/* ── Highlight do año ativo na timeline via IntersectionObserver */
+const anoTimeline = document.getElementById('ano-timeline');
+if (anoTimeline) {
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const ano = entry.target.id.replace('ano-', '');
+                document.querySelectorAll('.ano-btn').forEach(btn => {
+                    if (btn.dataset.ano === ano) {
+                        btn.classList.add('active');
+                        // Scroll da timeline para manter o ano visível
+                        btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    } else {
+                        // Só remover active se não foi filtrado pelo URL
+                        const anoParam = new URLSearchParams(window.location.search).get('ano');
+                        if (!anoParam) btn.classList.remove('active');
+                    }
+                });
+            }
+        });
+    }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+
+    document.querySelectorAll('[id^="ano-"]').forEach(el => observer.observe(el));
+}
+</script>
+{% endblock %}

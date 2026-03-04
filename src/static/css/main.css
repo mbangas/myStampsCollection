@@ -532,6 +532,31 @@ hr         { border-color: var(--border); opacity: 1; }
     color: var(--fg-subtle);
 }
 
+/* ── Checkboxes da coleção (variantes) ───────────────────────── */
+.form-check-input {
+    background-color: var(--bg-subtle);
+    border-color: var(--border);
+}
+.form-check-input:checked {
+    background-color: var(--accent-emphasis);
+    border-color: var(--accent-emphasis);
+}
+.form-check-label { color: var(--fg); font-size: .875rem; }
+
+/* ── Badge localização ────────────────────────────────────────── */
+.badge-localizacao {
+    background: rgba(31,111,235,.15);
+    border: 1px solid rgba(88,166,255,.3);
+    color: #79c0ff;
+    border-radius: 4px;
+    font-size: .7rem;
+    padding: .2em .5em;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    white-space: nowrap;
+}
+
 /* ── Responsividade ──────────────────────────────────────────── */
 @media (max-width: 576px) {
     .img-selo { height: 100px; }

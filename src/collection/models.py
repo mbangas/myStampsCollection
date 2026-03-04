@@ -3,7 +3,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-from catalog.models import Selo
+from catalog.models import Selo, Variante
 
 
 class ItemColecao(models.Model):
@@ -44,6 +44,17 @@ class ItemColecao(models.Model):
         verbose_name='Condição',
     )
     notas = models.TextField(blank=True, verbose_name='Notas pessoais')
+    localizacao = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name='Localização',
+        help_text='Ex.: Álbum A, Caixa 3, Envelope azul…',
+    )
+    variantes_possuidas = models.ManyToManyField(
+        Variante,
+        blank=True,
+        verbose_name='Variantes possuídas',
+    )
     data_adicao = models.DateTimeField(auto_now_add=True, verbose_name='Data de Adição')
     data_atualizacao = models.DateTimeField(auto_now=True, verbose_name='Última Atualização')
 

@@ -4,10 +4,11 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from catalog.models import Pais, Selo
-from .forms import FormularioItemColecao
+from .forms import FormularioItemColecao, FormularioLocalizacaoBulk
 from .models import ItemColecao
 
 
@@ -69,16 +70,17 @@ def adicionar_selo(request, selo_id: int):
         return redirect('collection:editar_item', pk=item_existente.pk)
 
     if request.method == 'POST':
-        formulario = FormularioItemColecao(request.POST)
+        formulario = FormularioItemColecao(request.POST, selo=selo)
         if formulario.is_valid():
             item = formulario.save(commit=False)
             item.utilizador = request.user
             item.stamp = selo
             item.save()
+            formulario.save_m2m()
             messages.success(request, f'"{selo.titulo}" adicionado à tua coleção!')
             return redirect('collection:colecao')
     else:
-        formulario = FormularioItemColecao()
+        formulario = FormularioItemColecao(selo=selo)
 
     return render(request, 'collection/formulario_item.html', {
         'formulario': formulario,
@@ -93,13 +95,13 @@ def editar_item(request, pk: int):
     item = get_object_or_404(ItemColecao, pk=pk, utilizador=request.user)
 
     if request.method == 'POST':
-        formulario = FormularioItemColecao(request.POST, instance=item)
+        formulario = FormularioItemColecao(request.POST, instance=item, selo=item.stamp)
         if formulario.is_valid():
             formulario.save()
             messages.success(request, 'Coleção atualizada com sucesso.')
             return redirect('collection:colecao')
     else:
-        formulario = FormularioItemColecao(instance=item)
+        formulario = FormularioItemColecao(instance=item, selo=item.stamp)
 
     return render(request, 'collection/formulario_item.html', {
         'formulario': formulario,
@@ -120,3 +122,35 @@ def remover_item(request, pk: int):
         return redirect('collection:colecao')
 
     return render(request, 'collection/confirmar_remocao.html', {'item': item})
+
+
+@login_required
+def atualizar_localizacao_bulk(request):
+    """Atualiza a localização de múltiplos itens da coleção de uma vez."""
+    if request.method == 'POST':
+        formulario = FormularioLocalizacaoBulk(request.POST)
+        if formulario.is_valid():
+            localizacao = formulario.cleaned_data['localizacao']
+            ids_raw = formulario.cleaned_data['itens']
+            try:
+                ids = [int(i) for i in ids_raw.split(',') if i.strip().isdigit()]
+            except ValueError:
+                ids = []
+
+            if ids:
+                atualizados = (
+                    request.user.itens_colecao
+                    .filter(pk__in=ids)
+                    .update(localizacao=localizacao)
+                )
+                messages.success(
+                    request,
+                    f'Localização "{localizacao}" aplicada a {atualizados} selos.'
+                )
+            else:
+                messages.warning(request, 'Nenhum selo selecionado.')
+        else:
+            messages.error(request, 'Formulário inválido.')
+
+    return redirect('collection:colecao')
+
