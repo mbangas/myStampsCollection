@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block titulo %}Responder à Proposta – Trocas{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h1 class="h5 mb-0">
+                    <i class="bi bi-reply me-1"></i>
+                    Proposta de <strong>{{ troca.iniciador.username }}</strong>
+                </h1>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <p class="fw-semibold text-success mb-1">
+                            <i class="bi bi-arrow-up me-1"></i> Ele/a oferece:
+                        </p>
+                        <ul class="small">
+                            {% for s in troca.selos_oferecidos.all %}
+                                <li>{{ s.titulo }} <span class="text-muted">({{ s.pais.nome }})</span></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="col-6">
+                        <p class="fw-semibold text-primary mb-1">
+                            <i class="bi bi-arrow-down me-1"></i> Ele/a pede:
+                        </p>
+                        <ul class="small">
+                            {% for s in troca.selos_pedidos.all %}
+                                <li>{{ s.titulo }} <span class="text-muted">({{ s.pais.nome }})</span></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                {% if troca.mensagem %}
+                <blockquote class="blockquote border-start ps-3 small">
+                    <p class="mb-0">{{ troca.mensagem }}</p>
+                    <footer class="blockquote-footer">{{ troca.iniciador.username }}</footer>
+                </blockquote>
+                {% endif %}
+
+                <hr>
+                <form method="post" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <button type="submit" name="acao" value="aceitar" class="btn btn-success">
+                        <i class="bi bi-check-lg me-1"></i> Aceitar
+                    </button>
+                    <button type="submit" name="acao" value="recusar" class="btn btn-outline-danger">
+                        <i class="bi bi-x-lg me-1"></i> Recusar
+                    </button>
+                    <a href="{% url 'exchange:trocas' %}" class="btn btn-outline-secondary ms-auto">
+                        Cancelar
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

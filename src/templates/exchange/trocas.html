@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block titulo %}Trocas – Selos do Mundo{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-arrow-left-right me-2"></i>Zona de Trocas</h1>
+    <a href="{% url 'exchange:matches' %}" class="btn btn-warning">
+        <i class="bi bi-lightning-fill me-1"></i> Ver Matches
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Trocas ativas -->
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h2 class="h6 mb-0"><i class="bi bi-hourglass-split me-1"></i> Trocas em Curso</h2>
+            </div>
+            <div class="card-body">
+                {% if trocas_ativas %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Contraparte</th>
+                                <th>Ofereço</th>
+                                <th>Recebo</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for troca in trocas_ativas %}
+                            <tr>
+                                <td>{{ troca.pk }}</td>
+                                <td>
+                                    {% if troca.iniciador == request.user %}
+                                        {{ troca.receptor.username }}
+                                        <span class="badge bg-secondary">enviei</span>
+                                    {% else %}
+                                        {{ troca.iniciador.username }}
+                                        <span class="badge bg-primary">recebi</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% for s in troca.selos_oferecidos.all %}
+                                        <span class="badge bg-light text-dark border">{{ s.titulo }}</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% for s in troca.selos_pedidos.all %}
+                                        <span class="badge bg-light text-dark border">{{ s.titulo }}</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <span class="badge
+                                        {% if troca.estado == 'pendente' %}bg-warning text-dark
+                                        {% elif troca.estado == 'aceite' %}bg-success
+                                        {% endif %}">
+                                        {{ troca.get_estado_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if troca.estado == 'pendente' and troca.receptor == request.user %}
+                                        <a href="{% url 'exchange:responder_troca' troca.pk %}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            Responder
+                                        </a>
+                                    {% elif troca.estado == 'aceite' %}
+                                        <a href="{% url 'exchange:concluir_troca' troca.pk %}"
+                                           class="btn btn-sm btn-outline-success">
+                                            Concluir
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <p class="text-muted mb-0">Sem trocas em curso.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Meus repetidos à troca -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h2 class="h6 mb-0"><i class="bi bi-box-arrow-up me-1"></i> Ofereço (repetidos)</h2>
+            </div>
+            <div class="card-body">
+                {% if minhas_ofertas %}
+                <ul class="list-group list-group-flush">
+                    {% for oferta in minhas_ofertas %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <span class="fw-semibold small">{{ oferta.selo.titulo }}</span>
+                            <small class="text-muted d-block">{{ oferta.selo.pais.nome }}</small>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">×{{ oferta.quantidade_disponivel }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                    <p class="text-muted small mb-0">
+                        Não tens selos repetidos marcados.<br>
+                        <a href="{% url 'collection:colecao' %}">Actualiza a tua coleção</a>
+                        para marcar repetidos.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Meus pedidos -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h2 class="h6 mb-0"><i class="bi bi-box-arrow-down me-1"></i> Procuro</h2>
+            </div>
+            <div class="card-body">
+                {% if meus_pedidos %}
+                <ul class="list-group list-group-flush">
+                    {% for pedido in meus_pedidos %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <span class="fw-semibold small">{{ pedido.selo.titulo }}</span>
+                            <small class="text-muted d-block">{{ pedido.selo.pais.nome }}</small>
+                        </div>
+                        <span class="badge bg-secondary rounded-pill">×{{ pedido.quantidade_pretendida }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                    <p class="text-muted small mb-0">Sem pedidos activos.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

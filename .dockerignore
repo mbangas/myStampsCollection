@@ -1,0 +1,47 @@
+# Controlo de versões
+.git/
+.gitignore
+
+# Ambientes virtuais Python
+.venv/
+venv/
+env/
+
+# Ficheiros Python compilados
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ficheiros Django que são gerados em runtime
+db.sqlite3
+/staticfiles/
+/media/
+
+# Variáveis de ambiente (não incluir no contexto de build)
+.env
+.env.*
+!.env.example
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Testes e CI
+*.coverage
+htmlcov/
+.pytest_cache/
+
+# README e documentação
+README.md

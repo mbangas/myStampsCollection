@@ -1,0 +1,24 @@
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Django
+*.pyc
+__pycache__/
+*.pyo
+db.sqlite3
+/staticfiles/
+/media/
+
+# Variáveis de ambiente
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

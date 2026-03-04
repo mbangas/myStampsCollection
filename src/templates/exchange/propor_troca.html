@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block titulo %}Propor Troca – Selos do Mundo{% endblock %}
+
+{% block conteudo %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'exchange:matches' %}">Matches</a></li>
+        <li class="breadcrumb-item active">Propor Troca</li>
+    </ol>
+</nav>
+
+<h1 class="h3 mb-4">
+    <i class="bi bi-send me-2"></i> Propor Troca com <strong>{{ receptor.username }}</strong>
+</h1>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="row g-4">
+        <!-- Selos que ofereço -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success bg-opacity-10">
+                    <h2 class="h6 mb-0 text-success">
+                        <i class="bi bi-arrow-up me-1"></i> Selos que ofereço (meus repetidos)
+                    </h2>
+                </div>
+                <div class="card-body" style="max-height:340px;overflow-y:auto;">
+                    {% for item in meus_repetidos %}
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox"
+                               name="selos_oferecer" value="{{ item.stamp.pk }}"
+                               id="oferecer_{{ item.stamp.pk }}">
+                        <label class="form-check-label small" for="oferecer_{{ item.stamp.pk }}">
+                            <strong>{{ item.stamp.titulo }}</strong>
+                            <span class="text-muted">({{ item.stamp.pais.nome }}, {{ item.stamp.ano }})</span>
+                            <span class="badge bg-warning text-dark ms-1">×{{ item.quantidade_repetidos }}</span>
+                        </label>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted small">Não tens selos repetidos disponíveis.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Selos que peço -->
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary bg-opacity-10">
+                    <h2 class="h6 mb-0 text-primary">
+                        <i class="bi bi-arrow-down me-1"></i> Selos que peço (repetidos de {{ receptor.username }})
+                    </h2>
+                </div>
+                <div class="card-body" style="max-height:340px;overflow-y:auto;">
+                    {% for item in repetidos_receptor %}
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox"
+                               name="selos_pedir" value="{{ item.stamp.pk }}"
+                               id="pedir_{{ item.stamp.pk }}">
+                        <label class="form-check-label small" for="pedir_{{ item.stamp.pk }}">
+                            <strong>{{ item.stamp.titulo }}</strong>
+                            <span class="text-muted">({{ item.stamp.pais.nome }}, {{ item.stamp.ano }})</span>
+                            <span class="badge bg-secondary ms-1">×{{ item.quantidade_repetidos }}</span>
+                        </label>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted small">{{ receptor.username }} não tem repetidos disponíveis.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensagem -->
+        <div class="col-12">
+            <label for="mensagem" class="form-label">Mensagem (opcional)</label>
+            <textarea class="form-control" id="mensagem" name="mensagem" rows="2"
+                      placeholder="Adiciona uma mensagem à proposta…"></textarea>
+        </div>
+
+        <div class="col-12">
+            <button type="submit" class="btn btn-warning">
+                <i class="bi bi-send me-1"></i> Enviar Proposta
+            </button>
+            <a href="{% url 'exchange:matches' %}" class="btn btn-outline-secondary ms-2">
+                Cancelar
+            </a>
+        </div>
+    </div>
+</form>
+{% endblock %}

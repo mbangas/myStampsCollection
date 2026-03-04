@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block titulo %}{{ acao }} Selo – Coleção{% endblock %}
+
+{% block conteudo %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'collection:colecao' %}">A Minha Coleção</a></li>
+        <li class="breadcrumb-item active">{{ acao }} Selo</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h1 class="h5 mb-0">
+                    <i class="bi bi-stamp me-1"></i> {{ acao }}: {{ selo.titulo }}
+                </h1>
+                <small class="text-muted">{{ selo.pais.nome }} · {{ selo.ano }}</small>
+            </div>
+            <div class="card-body">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {{ formulario|crispy }}
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i> Guardar
+                        </button>
+                        <a href="{% url 'collection:colecao' %}" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

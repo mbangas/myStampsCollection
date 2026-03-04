@@ -1,0 +1,27 @@
+# Força LF em ficheiros de texto (evita problemas CRLF em sistemas Windows)
+* text=auto
+
+# Scripts de shell devem sempre usar LF
+*.sh text eol=lf
+
+# Ficheiros de configuração
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
+*.conf text eol=lf
+
+# Ficheiros Python
+*.py text eol=lf
+
+# Ficheiros HTML/CSS/JS
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+
+# Imagens — binários, sem conversão
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.ico binary

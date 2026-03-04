@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block titulo %}A Minha Coleção – Selos do Mundo{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-collection me-2"></i>A Minha Coleção</h1>
+    <a href="{% url 'catalog:catalogo' %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-plus me-1"></i> Adicionar Selos
+    </a>
+</div>
+
+<!-- Indicadores -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card card-indicador text-center py-3">
+            <div class="card-body p-2">
+                <div class="fs-2 fw-bold text-primary">{{ totais.total_selos|default:0 }}</div>
+                <div class="small text-muted">Selos totais</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card card-indicador text-center py-3">
+            <div class="card-body p-2">
+                <div class="fs-2 fw-bold text-success">{{ totais.titulos_distintos|default:0 }}</div>
+                <div class="small text-muted">Títulos distintos</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card card-indicador text-center py-3">
+            <div class="card-body p-2">
+                <div class="fs-2 fw-bold text-info">{{ totais.paises_distintos|default:0 }}</div>
+                <div class="small text-muted">Países</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card card-indicador text-center py-3">
+            <div class="card-body p-2">
+                <div class="fs-2 fw-bold text-warning">{{ totais.total_repetidos|default:0 }}</div>
+                <div class="small text-muted">Repetidos</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<form method="get" class="row g-2 mb-4">
+    <div class="col-md-6">
+        <input type="text" name="q" value="{{ pesquisa }}" class="form-control form-control-sm"
+               placeholder="Pesquisar na coleção…">
+    </div>
+    <div class="col-md-4">
+        <select name="pais" class="form-select form-select-sm">
+            <option value="">Todos os países</option>
+            {% for p in paises %}
+            <option value="{{ p.id }}" {% if p.id|stringformat:"s" == pais_selecionado %}selected{% endif %}>
+                {{ p.nome }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+        <button class="btn btn-primary btn-sm w-100" type="submit">
+            <i class="bi bi-funnel"></i>
+        </button>
+        {% if pesquisa or pais_selecionado %}
+        <a href="{% url 'collection:colecao' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-x-lg"></i>
+        </a>
+        {% endif %}
+    </div>
+</form>
+
+<!-- Lista de itens agrupados por país -->
+{% regroup itens by stamp.pais.nome as grupos %}
+{% for grupo in grupos %}
+<div class="mb-4">
+    <h2 class="h6 text-uppercase text-muted mb-2 border-bottom pb-1">
+        <i class="bi bi-flag me-1"></i> {{ grupo.grouper }}
+    </h2>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:60px;"></th>
+                    <th>Selo</th>
+                    <th class="text-center">Ano</th>
+                    <th class="text-center">Qtd.</th>
+                    <th class="text-center">Repetidos</th>
+                    <th>Condição</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in grupo.list %}
+                <tr>
+                    <td>
+                        {% if item.stamp.imagem %}
+                            <img src="{{ item.stamp.imagem.url }}" alt="{{ item.stamp.titulo }}"
+                                 class="rounded" style="width:48px;height:32px;object-fit:cover;">
+                        {% else %}
+                            <div class="bg-light rounded d-flex align-items-center
+                                        justify-content-center" style="width:48px;height:32px;">
+                                <i class="bi bi-image text-secondary small"></i>
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'catalog:selo_detalhe' item.stamp.pk %}">
+                            {{ item.stamp.titulo }}
+                        </a>
+                        <small class="text-muted d-block">Nº {{ item.stamp.numero_catalogo }}</small>
+                    </td>
+                    <td class="text-center">{{ item.stamp.ano }}</td>
+                    <td class="text-center">{{ item.quantidade_possuida }}</td>
+                    <td class="text-center">
+                        {% if item.quantidade_repetidos > 0 %}
+                            <span class="badge bg-warning text-dark">{{ item.quantidade_repetidos }}</span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ item.get_condicao_display }}</span>
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'collection:editar_item' item.pk %}"
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'collection:remover_item' item.pk %}"
+                           class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% empty %}
+<div class="text-center py-5">
+    <i class="bi bi-stamp text-secondary" style="font-size:3rem;"></i>
+    <p class="text-muted mt-3">A tua coleção está vazia.<br>
+        <a href="{% url 'catalog:catalogo' %}">Começa a explorar o catálogo!</a>
+    </p>
+</div>
+{% endfor %}
+{% endblock %}

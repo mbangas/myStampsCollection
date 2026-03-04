@@ -1,0 +1,28 @@
+# =============================================================================
+# Overrides de desenvolvimento local — aplica-se automaticamente sobre
+# docker-compose.yml quando executas `docker compose up`.
+# Em produção, usa: docker compose -f docker-compose.yml up
+# =============================================================================
+
+services:
+  web:
+    build:
+      target: runtime
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      # Monta o código local no contentor → alterações refletem imediatamente
+      - .:/app
+      # Preserva os uploads entre reinícios
+      - media_data:/app/media
+    environment:
+      DEBUG: "True"
+    ports:
+      # Expõe directamente o Django em dev (sem Nginx)
+      - "8000:8000"
+
+  # Desactiva o Nginx em desenvolvimento
+  nginx:
+    profiles:
+      - production

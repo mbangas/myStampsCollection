@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block titulo %}Catálogo – Selos do Mundo{% endblock %}
+
+{% block conteudo %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0"><i class="bi bi-globe2 me-2"></i>Catálogo por País</h1>
+    <a href="{% url 'exchange:matches' %}" class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-lightning me-1"></i> Ver Matches de Troca
+    </a>
+</div>
+
+<!-- Pesquisa -->
+<form method="get" class="mb-4">
+    <div class="input-group">
+        <input type="text" name="q" value="{{ pesquisa }}" class="form-control"
+               placeholder="Pesquisar país…">
+        <button class="btn btn-primary" type="submit">
+            <i class="bi bi-search"></i>
+        </button>
+        {% if pesquisa %}
+        <a href="{% url 'catalog:catalogo' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-x-lg"></i>
+        </a>
+        {% endif %}
+    </div>
+</form>
+
+{% if pesquisa %}
+<p class="text-muted small">
+    {{ paises|length }} resultado(s) para "<strong>{{ pesquisa }}</strong>"
+</p>
+{% endif %}
+
+<!-- Grelha de países -->
+<div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
+    {% for pais in paises %}
+    <div class="col">
+        <a href="{% url 'catalog:pais_detalhe' pais.pk %}"
+           class="card h-100 text-decoration-none card-pais {% if pais.id in paises_interesse %}border-primary{% endif %}">
+            <div class="card-body text-center p-3">
+                {% if pais.bandeira %}
+                    <img src="{{ pais.bandeira.url }}" alt="Bandeira {{ pais.nome }}"
+                         class="mb-2 rounded" style="width:48px;height:32px;object-fit:cover;">
+                {% else %}
+                    <div class="mb-2 bg-secondary rounded d-inline-flex align-items-center
+                                justify-content-center" style="width:48px;height:32px;">
+                        <i class="bi bi-flag text-white small"></i>
+                    </div>
+                {% endif %}
+                <div class="fw-semibold small">{{ pais.nome }}</div>
+                <div class="text-muted" style="font-size:.75rem;">
+                    {{ pais.num_selos }} selo{{ pais.num_selos|pluralize }}
+                </div>
+            </div>
+            {% if pais.id in paises_interesse %}
+            <div class="card-footer text-center py-1 bg-primary bg-opacity-10">
+                <small class="text-primary"><i class="bi bi-star-fill me-1"></i>Favorito</small>
+            </div>
+            {% endif %}
+        </a>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <p class="text-muted">Nenhum país encontrado.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

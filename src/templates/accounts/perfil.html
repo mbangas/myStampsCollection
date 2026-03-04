@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block titulo %}Perfil – Selos do Mundo{% endblock %}
+
+{% block conteudo %}
+<div class="row g-4">
+    <!-- ── Indicadores ──────────────────────────────── -->
+    <div class="col-md-4">
+        <div class="card shadow-sm text-center">
+            <div class="card-body">
+                {% if perfil.avatar %}
+                    <img src="{{ perfil.avatar.url }}" alt="Avatar"
+                         class="rounded-circle mb-3" width="96" height="96">
+                {% else %}
+                    <div class="rounded-circle bg-secondary d-flex align-items-center
+                                justify-content-center mx-auto mb-3"
+                         style="width:96px;height:96px;">
+                        <i class="bi bi-person text-white fs-1"></i>
+                    </div>
+                {% endif %}
+                <h2 class="h5">{{ request.user.get_full_name|default:request.user.username }}</h2>
+                <p class="text-muted small">{{ request.user.email }}</p>
+                {% if perfil.bio %}
+                    <p class="small">{{ perfil.bio }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row g-2 mt-1">
+            <div class="col-6">
+                <div class="card card-indicador text-center py-3">
+                    <div class="card-body p-2">
+                        <div class="fs-2 fw-bold text-primary">{{ perfil.total_selos }}</div>
+                        <div class="small text-muted">Selos na coleção</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card card-indicador text-center py-3">
+                    <div class="card-body p-2">
+                        <div class="fs-2 fw-bold text-warning">{{ perfil.total_repetidos }}</div>
+                        <div class="small text-muted">Repetidos</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Formulário ──────────────────────────────── -->
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h2 class="h6 mb-0"><i class="bi bi-pencil me-1"></i> Editar Perfil</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    {{ formulario|crispy }}
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i> Guardar
+                        </button>
+                        <a href="{% url 'catalog:catalogo' %}" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

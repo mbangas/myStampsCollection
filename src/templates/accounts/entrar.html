@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block titulo %}Entrar – Selos do Mundo{% endblock %}
+
+{% block conteudo %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h4 mb-4 text-center">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Entrar
+                </h1>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-grid mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-door-open me-1"></i> Entrar
+                        </button>
+                    </div>
+                </form>
+                <hr>
+                <p class="text-center mb-0 small">
+                    Ainda não tens conta?
+                    <a href="{% url 'accounts:registar' %}">Registar</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

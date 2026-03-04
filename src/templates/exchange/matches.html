@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block titulo %}Matches de Troca – Selos do Mundo{% endblock %}
+
+{% block conteudo %}
+<div class="mb-4">
+    <h1 class="h3"><i class="bi bi-lightning-fill text-warning me-2"></i>Matches de Troca</h1>
+    <p class="text-muted">
+        Utilizadores com quem podes trocar — têm selos que procuras e/ou procuram selos que tens repetidos.
+    </p>
+</div>
+
+{% if matches %}
+<div class="row g-3">
+    {% for match in matches %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow-sm h-100 border-warning border-opacity-50">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-person-circle me-1"></i>
+                    <strong>{{ match.utilizador.username }}</strong>
+                    {% if match.utilizador.get_full_name %}
+                        <small class="text-muted">— {{ match.utilizador.get_full_name }}</small>
+                    {% endif %}
+                </div>
+                <span class="badge bg-warning text-dark">
+                    {{ match.score }} match{{ match.score|pluralize:"es" }}
+                </span>
+            </div>
+            <div class="card-body small">
+                {% if match.posso_dar %}
+                <p class="fw-semibold text-success mb-1">
+                    <i class="bi bi-arrow-up-circle me-1"></i> Posso dar ({{ match.posso_dar|length }}):
+                </p>
+                <ul class="mb-2 ps-3">
+                    {% for selo_id in match.posso_dar %}
+                    <li class="text-muted">Selo #{{ selo_id }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                {% if match.posso_receber %}
+                <p class="fw-semibold text-primary mb-1">
+                    <i class="bi bi-arrow-down-circle me-1"></i> Posso receber ({{ match.posso_receber|length }}):
+                </p>
+                <ul class="mb-0 ps-3">
+                    {% for selo_id in match.posso_receber %}
+                    <li class="text-muted">Selo #{{ selo_id }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'exchange:propor_troca' match.utilizador.pk %}"
+                   class="btn btn-warning btn-sm w-100">
+                    <i class="bi bi-send me-1"></i> Propor Troca
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-search text-secondary" style="font-size:3rem;"></i>
+    <p class="text-muted mt-3">
+        Ainda não foram encontrados matches.<br>
+        Certifica-te que tens selos repetidos na coleção e pedidos ativos.
+    </p>
+    <a href="{% url 'collection:colecao' %}" class="btn btn-outline-primary">
+        Gerir Coleção
+    </a>
+</div>
+{% endif %}
+{% endblock %}
