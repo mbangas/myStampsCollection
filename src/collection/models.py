@@ -67,7 +67,7 @@ class ItemColecao(models.Model):
     def __str__(self) -> str:
         return f'{self.utilizador.username} – {self.stamp}'
 
-    def clean(self):
+    def clean(self) -> None:
         """Valida que repetidos não excede o total possuído."""
         from django.core.exceptions import ValidationError
         if self.quantidade_repetidos > self.quantidade_possuida:

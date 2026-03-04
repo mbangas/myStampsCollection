@@ -2,6 +2,7 @@
 
 from django import forms
 
+from catalog.models import Selo
 from .models import ItemColecao
 
 
@@ -42,7 +43,7 @@ class FormularioItemColecao(forms.ModelForm):
             'variantes_possuidas': forms.CheckboxSelectMultiple(),
         }
 
-    def __init__(self, *args, selo=None, **kwargs):
+    def __init__(self, *args, selo: Selo | None = None, **kwargs) -> None:
         """Filtra variantes pelo selo específico."""
         super().__init__(*args, **kwargs)
         if selo is not None:
@@ -52,7 +53,8 @@ class FormularioItemColecao(forms.ModelForm):
         else:
             self.fields['variantes_possuidas'].widget = forms.HiddenInput()
 
-    def clean(self):
+    def clean(self) -> dict:
+        """Valida que os selos repetidos não excedem a quantidade total possuída."""
         cleaned_data = super().clean()
         possuida = cleaned_data.get('quantidade_possuida', 0)
         repetidos = cleaned_data.get('quantidade_repetidos', 0)

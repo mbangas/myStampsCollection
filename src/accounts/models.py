@@ -57,14 +57,14 @@ class PerfilUtilizador(models.Model):
 
 
 @receiver(post_save, sender=User)
-def criar_perfil_utilizador(sender, instance, created, **kwargs):
+def criar_perfil_utilizador(sender: type, instance: User, created: bool, **kwargs) -> None:
     """Cria automaticamente um perfil ao registar um utilizador."""
     if created:
         PerfilUtilizador.objects.create(utilizador=instance)
 
 
 @receiver(post_save, sender=User)
-def guardar_perfil_utilizador(sender, instance, created, **kwargs):
+def guardar_perfil_utilizador(sender: type, instance: User, created: bool, **kwargs) -> None:
     """Guarda o perfil quando o utilizador é guardado."""
     if not created:
         PerfilUtilizador.objects.get_or_create(utilizador=instance)

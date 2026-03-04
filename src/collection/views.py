@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count
-from django.http import JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from catalog.models import Pais, Selo
@@ -13,7 +13,7 @@ from .models import ItemColecao
 
 
 @login_required
-def vista_colecao(request):
+def vista_colecao(request: HttpRequest) -> HttpResponse:
     """Mostra a coleção completa do utilizador com indicadores."""
     itens = (
         request.user.itens_colecao
@@ -60,7 +60,7 @@ def vista_colecao(request):
 
 
 @login_required
-def adicionar_selo(request, selo_id: int):
+def adicionar_selo(request: HttpRequest, selo_id: int) -> HttpResponse:
     """Adiciona um selo à coleção ou redireciona para edição se já existir."""
     selo = get_object_or_404(Selo, pk=selo_id)
 
@@ -90,7 +90,7 @@ def adicionar_selo(request, selo_id: int):
 
 
 @login_required
-def editar_item(request, pk: int):
+def editar_item(request: HttpRequest, pk: int) -> HttpResponse:
     """Edita a quantidade e condição de um item da coleção."""
     item = get_object_or_404(ItemColecao, pk=pk, utilizador=request.user)
 
@@ -111,7 +111,7 @@ def editar_item(request, pk: int):
 
 
 @login_required
-def remover_item(request, pk: int):
+def remover_item(request: HttpRequest, pk: int) -> HttpResponse:
     """Remove um item da coleção do utilizador."""
     item = get_object_or_404(ItemColecao, pk=pk, utilizador=request.user)
 
@@ -125,7 +125,7 @@ def remover_item(request, pk: int):
 
 
 @login_required
-def atualizar_localizacao_bulk(request):
+def atualizar_localizacao_bulk(request: HttpRequest) -> HttpResponse:
     """Atualiza a localização de múltiplos itens da coleção de uma vez."""
     if request.method == 'POST':
         formulario = FormularioLocalizacaoBulk(request.POST)

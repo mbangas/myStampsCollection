@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Q
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from collection.models import ItemColecao
@@ -11,7 +12,7 @@ from .models import OfertaTroca, PedidoTroca, Troca
 
 
 @login_required
-def vista_trocas(request):
+def vista_trocas(request: HttpRequest) -> HttpResponse:
     """Painel principal de trocas: ofertas, pedidos e histórico."""
     minhas_ofertas = OfertaTroca.objects.filter(
         utilizador=request.user, ativa=True
@@ -37,7 +38,7 @@ def vista_trocas(request):
 
 
 @login_required
-def vista_matches(request):
+def vista_matches(request: HttpRequest) -> HttpResponse:
     """
     Mostra os matches automáticos: selos que o utilizador tem repetidos
     e que outros utilizadores procuram, e vice-versa.
@@ -91,7 +92,7 @@ def vista_matches(request):
 
 
 @login_required
-def propor_troca(request, utilizador_id: int):
+def propor_troca(request: HttpRequest, utilizador_id: int) -> HttpResponse:
     """Formula uma proposta de troca com outro utilizador."""
     receptor = get_object_or_404(User, pk=utilizador_id)
 
@@ -134,7 +135,7 @@ def propor_troca(request, utilizador_id: int):
 
 
 @login_required
-def responder_troca(request, troca_id: int):
+def responder_troca(request: HttpRequest, troca_id: int) -> HttpResponse:
     """Aceita ou recusa uma proposta de troca."""
     troca = get_object_or_404(Troca, pk=troca_id, receptor=request.user, estado='pendente')
 
@@ -154,7 +155,7 @@ def responder_troca(request, troca_id: int):
 
 
 @login_required
-def concluir_troca(request, troca_id: int):
+def concluir_troca(request: HttpRequest, troca_id: int) -> HttpResponse:
     """Marca uma troca como concluída após a entrega física."""
     troca = get_object_or_404(
         Troca,
@@ -176,7 +177,7 @@ def concluir_troca(request, troca_id: int):
 
 
 @login_required
-def disponibilizar_repetidos(request):
+def disponibilizar_repetidos(request: HttpRequest) -> HttpResponse:
     """
     Cria ou actualiza OfertaTroca para todos os itens da coleção do utilizador
     que tenham quantidade_repetidos > 0. Opera apenas via POST.

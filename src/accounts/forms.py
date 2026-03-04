@@ -68,7 +68,8 @@ class FormularioPerfil(forms.ModelForm):
             'paises_interesse': forms.CheckboxSelectMultiple(),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
+        """Pré-preenche os campos do utilizador a partir da instância do perfil."""
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.utilizador_id:
             utilizador = self.instance.utilizador

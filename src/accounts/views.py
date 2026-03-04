@@ -4,6 +4,8 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView
+from django.forms import BaseForm
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.generic import CreateView
 from django.urls import reverse_lazy
@@ -19,13 +21,15 @@ class VistaRegisto(CreateView):
     template_name = 'accounts/registo.html'
     success_url = reverse_lazy('catalog:catalogo')
 
-    def form_valid(self, form):
+    def form_valid(self, form: BaseForm) -> HttpResponse:
+        """Guarda o utilizador, autentica-o e redireciona para o catálogo."""
         utilizador = form.save()
         login(self.request, utilizador)
         messages.success(self.request, f'Bem-vindo(a), {utilizador.first_name or utilizador.username}!')
         return redirect(self.success_url)
 
-    def dispatch(self, request, *args, **kwargs):
+    def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+        """Redireciona para o catálogo se o utilizador já estiver autenticado."""
         if request.user.is_authenticated:
             return redirect('catalog:catalogo')
         return super().dispatch(request, *args, **kwargs)
@@ -37,18 +41,20 @@ class VistaEntrada(LoginView):
     form_class = FormularioEntrada
     template_name = 'accounts/entrar.html'
 
-    def form_valid(self, form):
+    def form_valid(self, form: BaseForm) -> HttpResponse:
+        """Autentica o utilizador e mostra mensagem de boas-vindas."""
         messages.success(self.request, f'Bem-vindo(a) de volta, {form.get_user().username}!')
         return super().form_valid(form)
 
-    def dispatch(self, request, *args, **kwargs):
+    def dispatch(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+        """Redireciona para o catálogo se o utilizador já estiver autenticado."""
         if request.user.is_authenticated:
             return redirect('catalog:catalogo')
         return super().dispatch(request, *args, **kwargs)
 
 
 @login_required
-def vista_sair(request):
+def vista_sair(request: HttpRequest) -> HttpResponse:
     """Termina a sessão do utilizador."""
     logout(request)
     messages.info(request, 'Sessão terminada com sucesso.')
@@ -56,7 +62,7 @@ def vista_sair(request):
 
 
 @login_required
-def vista_perfil(request):
+def vista_perfil(request: HttpRequest) -> HttpResponse:
     """Mostra e edita o perfil do utilizador autenticado."""
     perfil, _ = PerfilUtilizador.objects.get_or_create(utilizador=request.user)
 
