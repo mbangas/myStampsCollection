@@ -64,6 +64,7 @@ def criar_perfil_utilizador(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=User)
-def guardar_perfil_utilizador(sender, instance, **kwargs):
+def guardar_perfil_utilizador(sender, instance, created, **kwargs):
     """Guarda o perfil quando o utilizador é guardado."""
-    instance.perfil.save()
+    if not created:
+        PerfilUtilizador.objects.get_or_create(utilizador=instance)
