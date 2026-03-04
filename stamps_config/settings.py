@@ -129,10 +129,15 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
-    BASE_DIR / 'css',
     BASE_DIR / 'src' / 'static',
 ]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Em desenvolvimento, usa armazenamento simples (sem hashes de manifesto)
+# para que as alterações em CSS/JS sejam refletidas imediatamente.
+if DEBUG:
+    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+else:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # ─── Ficheiros de Media (uploads) ─────────────────────────────────────────────
 
