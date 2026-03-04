@@ -19,11 +19,11 @@
     <div class="col-md-4 text-center">
         {% if selo.imagem %}
             <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
-                 class="img-fluid rounded shadow" style="max-height:320px;">
+                 class="img-fluid stamp-detail-img" style="max-height:300px;">
         {% else %}
-            <div class="bg-light rounded d-flex align-items-center justify-content-center"
-                 style="height:260px;">
-                <i class="bi bi-image text-secondary" style="font-size:4rem;"></i>
+            <div class="stamp-detail-img d-flex align-items-center justify-content-center"
+                 style="height:240px;">
+                <i class="bi bi-image" style="font-size:4rem;color:#6e7681;"></i>
             </div>
         {% endif %}
 

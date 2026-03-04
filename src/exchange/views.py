@@ -173,3 +173,45 @@ def concluir_troca(request, troca_id: int):
         return redirect('exchange:trocas')
 
     return render(request, 'exchange/concluir_troca.html', {'troca': troca})
+
+
+@login_required
+def disponibilizar_repetidos(request):
+    """
+    Cria ou actualiza OfertaTroca para todos os itens da coleção do utilizador
+    que tenham quantidade_repetidos > 0. Opera apenas via POST.
+    """
+    if request.method != 'POST':
+        return redirect('exchange:trocas')
+
+    itens_repetidos = ItemColecao.objects.filter(
+        utilizador=request.user,
+        quantidade_repetidos__gt=0,
+    ).select_related('stamp')
+
+    criadas = actualizadas = 0
+    for item in itens_repetidos:
+        oferta, criada = OfertaTroca.objects.update_or_create(
+            utilizador=request.user,
+            selo=item.stamp,
+            defaults={
+                'quantidade_disponivel': item.quantidade_repetidos,
+                'ativa': True,
+            },
+        )
+        if criada:
+            criadas += 1
+        else:
+            actualizadas += 1
+
+    total = criadas + actualizadas
+    if total:
+        messages.success(
+            request,
+            f'{total} oferta(s) de troca criadas/actualizadas '
+            f'({criadas} nova(s), {actualizadas} actualizada(s)).'
+        )
+    else:
+        messages.info(request, 'Não tens selos repetidos na coleção para disponibilizar.')
+
+    return redirect('exchange:trocas')

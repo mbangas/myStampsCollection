@@ -3,11 +3,22 @@
 {% block titulo %}A Minha Coleção – Selos do Mundo{% endblock %}
 
 {% block conteudo %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0"><i class="bi bi-collection me-2"></i>A Minha Coleção</h1>
-    <a href="{% url 'catalog:catalogo' %}" class="btn btn-outline-primary btn-sm">
-        <i class="bi bi-plus me-1"></i> Adicionar Selos
-    </a>
+<div class="page-header">
+    <h1><i class="bi bi-collection me-2"></i>A Minha Coleção</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        {% if totais.total_repetidos %}
+        <form method="post" action="{% url 'exchange:disponibilizar_repetidos' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-warning btn-sm">
+                <i class="bi bi-arrow-left-right me-1"></i>
+                Disponibilizar {{ totais.total_repetidos }} repetido{{ totais.total_repetidos|pluralize }} para troca
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'catalog:catalogo' %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-plus me-1"></i> Adicionar Selos
+        </a>
+    </div>
 </div>
 
 <!-- Indicadores -->
@@ -15,32 +26,32 @@
     <div class="col-6 col-md-3">
         <div class="card card-indicador text-center py-3">
             <div class="card-body p-2">
-                <div class="fs-2 fw-bold text-primary">{{ totais.total_selos|default:0 }}</div>
-                <div class="small text-muted">Selos totais</div>
+                <div class="stat-val" style="color:#58a6ff;">{{ totais.total_selos|default:0 }}</div>
+                <div class="small" style="color:#8b949e;">Selos totais</div>
             </div>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="card card-indicador text-center py-3">
             <div class="card-body p-2">
-                <div class="fs-2 fw-bold text-success">{{ totais.titulos_distintos|default:0 }}</div>
-                <div class="small text-muted">Títulos distintos</div>
+                <div class="stat-val" style="color:#3fb950;">{{ totais.titulos_distintos|default:0 }}</div>
+                <div class="small" style="color:#8b949e;">Títulos distintos</div>
             </div>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="card card-indicador text-center py-3">
             <div class="card-body p-2">
-                <div class="fs-2 fw-bold text-info">{{ totais.paises_distintos|default:0 }}</div>
-                <div class="small text-muted">Países</div>
+                <div class="stat-val" style="color:#79c0ff;">{{ totais.paises_distintos|default:0 }}</div>
+                <div class="small" style="color:#8b949e;">Países</div>
             </div>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="card card-indicador text-center py-3">
             <div class="card-body p-2">
-                <div class="fs-2 fw-bold text-warning">{{ totais.total_repetidos|default:0 }}</div>
-                <div class="small text-muted">Repetidos</div>
+                <div class="stat-val" style="color:#e3b341;">{{ totais.total_repetidos|default:0 }}</div>
+                <div class="small" style="color:#8b949e;">Repetidos</div>
             </div>
         </div>
     </div>
@@ -78,12 +89,12 @@
 {% regroup itens by stamp.pais.nome as grupos %}
 {% for grupo in grupos %}
 <div class="mb-4">
-    <h2 class="h6 text-uppercase text-muted mb-2 border-bottom pb-1">
-        <i class="bi bi-flag me-1"></i> {{ grupo.grouper }}
-    </h2>
+    <div class="section-label">
+        <i class="bi bi-flag"></i> {{ grupo.grouper }}
+    </div>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
-            <thead class="table-light">
+            <thead>
                 <tr>
                     <th style="width:60px;"></th>
                     <th>Selo</th>
@@ -102,9 +113,9 @@
                             <img src="{{ item.stamp.imagem.url }}" alt="{{ item.stamp.titulo }}"
                                  class="rounded" style="width:48px;height:32px;object-fit:cover;">
                         {% else %}
-                            <div class="bg-light rounded d-flex align-items-center
-                                        justify-content-center" style="width:48px;height:32px;">
-                                <i class="bi bi-image text-secondary small"></i>
+                            <div class="rounded d-flex align-items-center
+                                        justify-content-center" style="width:48px;height:32px;background:#010409;">
+                                <i class="bi bi-image" style="color:#6e7681;"></i>
                             </div>
                         {% endif %}
                     </td>
@@ -150,4 +161,39 @@
     </p>
 </div>
 {% endfor %}
+
+<!-- Paginação -->
+{% if pagina.has_other_pages %}
+<nav class="mt-4" aria-label="Paginação">
+    <ul class="pagination justify-content-center flex-wrap">
+        {% if pagina.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?pagina={{ pagina.previous_page_number }}&pais={{ pais_selecionado }}&q={{ pesquisa }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        {% for num in pagina.paginator.page_range %}
+            {% if pagina.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > pagina.number|add:"-4" and num < pagina.number|add:"4" %}
+            <li class="page-item">
+                <a class="page-link" href="?pagina={{ num }}&pais={{ pais_selecionado }}&q={{ pesquisa }}">{{ num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+        {% if pagina.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?pagina={{ pagina.next_page_number }}&pais={{ pais_selecionado }}&q={{ pesquisa }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+    <p class="text-center text-muted small">
+        Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}
+        ({{ pagina.paginator.count }} item{{ pagina.paginator.count|pluralize }})
+    </p>
+</nav>
+{% endif %}
 {% endblock %}

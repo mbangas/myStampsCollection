@@ -1,6 +1,7 @@
 """Vistas da aplicação Catálogo."""
 
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404, render
 from django.utils.decorators import method_decorator
@@ -49,10 +50,17 @@ class VistaPais(DetailView):
         context = super().get_context_data(**kwargs)
         selos = self.object.selos.prefetch_related('temas')
 
+        # Lista de todos os anos disponíveis para este país (para a barra de navegação)
+        anos_disponiveis = list(
+            self.object.selos.values_list('ano', flat=True)
+            .distinct()
+            .order_by('ano')
+        )
+
         # Filtragem de selos
         pesquisa = self.request.GET.get('q', '').strip()
-        tema_id = self.request.GET.get('tema', '').strip()
-        ano = self.request.GET.get('ano', '').strip()
+        tema_id  = self.request.GET.get('tema', '').strip()
+        ano      = self.request.GET.get('ano', '').strip()
 
         if pesquisa:
             selos = selos.filter(
@@ -65,6 +73,11 @@ class VistaPais(DetailView):
         if ano:
             selos = selos.filter(ano=ano)
 
+        # Paginação: 24 selos por página
+        paginator = Paginator(selos, 24)
+        pagina_num = self.request.GET.get('pagina', 1)
+        pagina = paginator.get_page(pagina_num)
+
         # IDs dos selos que o utilizador já tem
         ids_colecao = set(
             self.request.user.itens_colecao
@@ -72,17 +85,14 @@ class VistaPais(DetailView):
             .values_list('stamp_id', flat=True)
         )
 
-        context['selos'] = selos
-        context['ids_colecao'] = ids_colecao
-        context['temas'] = Tema.objects.all()
-        context['anos'] = (
-            self.object.selos.values_list('ano', flat=True)
-            .distinct()
-            .order_by('ano')
-        )
-        context['pesquisa'] = pesquisa
-        context['tema_selecionado'] = tema_id
-        context['ano_selecionado'] = ano
+        context['selos']              = pagina
+        context['pagina']             = pagina
+        context['ids_colecao']        = ids_colecao
+        context['temas']              = Tema.objects.all()
+        context['anos']               = anos_disponiveis
+        context['pesquisa']           = pesquisa
+        context['tema_selecionado']   = tema_id
+        context['ano_selecionado']    = ano
         return context
 
 

@@ -2,6 +2,7 @@
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Sum, Count
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -41,8 +42,14 @@ def vista_colecao(request):
         selos__itens_colecao__utilizador=request.user
     ).distinct().order_by('nome')
 
+    # Paginação: 25 itens por página
+    paginator = Paginator(itens, 25)
+    pagina_num = request.GET.get('pagina', 1)
+    pagina = paginator.get_page(pagina_num)
+
     context = {
-        'itens': itens,
+        'itens': pagina,
+        'pagina': pagina,
         'totais': totais,
         'paises': paises,
         'pais_selecionado': pais_id,

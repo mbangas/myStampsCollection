@@ -12,7 +12,7 @@
 </nav>
 
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-7">
         <div class="card shadow-sm">
             <div class="card-header">
                 <h1 class="h5 mb-0">
@@ -21,6 +21,20 @@
                 <small class="text-muted">{{ selo.pais.nome }} · {{ selo.ano }}</small>
             </div>
             <div class="card-body">
+
+                <!-- Imagem do selo -->
+                {% if selo.imagem %}
+                <div class="text-center mb-3">
+                    <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
+                         class="img-fluid rounded shadow-sm" style="max-height:180px;">
+                </div>
+                {% else %}
+                <div class="d-flex align-items-center justify-content-center mb-3
+                            rounded" style="height:120px;background:#010409;border:1px solid #30363d;">
+                    <i class="bi bi-image" style="font-size:3rem;color:#6e7681;"></i>
+                </div>
+                {% endif %}
+
                 <form method="post" novalidate>
                     {% csrf_token %}
                     {{ formulario|crispy }}

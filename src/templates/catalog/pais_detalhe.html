@@ -10,15 +10,19 @@
     </ol>
 </nav>
 
-<div class="d-flex align-items-center gap-3 mb-4">
-    {% if pais.bandeira %}
-        <img src="{{ pais.bandeira.url }}" alt="Bandeira" class="rounded shadow-sm"
-             style="width:64px;height:42px;object-fit:cover;">
-    {% endif %}
-    <div>
-        <h1 class="h3 mb-0">{{ pais.nome }}</h1>
-        <span class="badge bg-secondary">{{ pais.codigo_iso }}</span>
-        <span class="text-muted small ms-2">{{ pais.total_selos }} selos no catálogo</span>
+<!-- Cabeçalho país -->
+<div class="page-header">
+    <div class="d-flex align-items-center gap-3">
+        {% if pais.bandeira %}
+            <img src="{{ pais.bandeira.url }}" alt="Bandeira" class="rounded"
+                 style="width:56px;height:37px;object-fit:cover;border:1px solid #30363d;">
+        {% else %}
+            <span class="fi fi-{{ pais.codigo_iso|lower }}" style="font-size:2.2rem;"></span>
+        {% endif %}
+        <div>
+            <h1 style="margin:0;">{{ pais.nome }}</h1>
+            <span style="font-size:.75rem;color:#8b949e;">{{ pais.codigo_iso }} &middot; {{ pais.total_selos }} selos no catálogo</span>
+        </div>
     </div>
 </div>
 
@@ -27,7 +31,7 @@
 {% endif %}
 
 <!-- Filtros -->
-<form method="get" class="row g-2 mb-4">
+<form method="get" class="row g-2 mb-2" id="form-filtros">
     <div class="col-md-5">
         <input type="text" name="q" value="{{ pesquisa }}" class="form-control form-control-sm"
                placeholder="Pesquisar selos…">
@@ -43,14 +47,7 @@
         </select>
     </div>
     <div class="col-md-2">
-        <select name="ano" class="form-select form-select-sm">
-            <option value="">Todos os anos</option>
-            {% for ano in anos %}
-            <option value="{{ ano }}" {% if ano|stringformat:"s" == ano_selecionado %}selected{% endif %}>
-                {{ ano }}
-            </option>
-            {% endfor %}
-        </select>
+        <input type="hidden" name="ano" value="{{ ano_selecionado }}">
     </div>
     <div class="col-md-2 d-flex gap-1">
         <button class="btn btn-primary btn-sm w-100" type="submit">
@@ -62,49 +59,122 @@
     </div>
 </form>
 
-<!-- Grelha de selos -->
-<div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3">
-    {% for selo in selos %}
-    <div class="col">
-        <div class="card h-100 card-selo {% if selo.pk in ids_colecao %}border-success{% endif %}">
-            <a href="{% url 'catalog:selo_detalhe' selo.pk %}">
-                {% if selo.imagem %}
-                    <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
-                         class="card-img-top img-selo">
-                {% else %}
-                    <div class="card-img-top img-selo-placeholder d-flex align-items-center
-                                justify-content-center bg-light">
-                        <i class="bi bi-image text-secondary fs-1"></i>
-                    </div>
-                {% endif %}
-            </a>
-            <div class="card-body p-2">
-                <p class="card-text small mb-1 fw-semibold">{{ selo.titulo }}</p>
-                <p class="card-text text-muted" style="font-size:.75rem;">
-                    {{ selo.ano }} · {{ selo.denominacao }} {{ selo.moeda }}
-                </p>
-                <p class="card-text text-muted" style="font-size:.7rem;">
-                    Nº {{ selo.numero_catalogo }}
-                </p>
-            </div>
-            <div class="card-footer p-2 d-flex gap-1">
-                {% if selo.pk in ids_colecao %}
-                    <span class="badge bg-success w-100 text-center">
-                        <i class="bi bi-check me-1"></i>Tenho
-                    </span>
-                {% else %}
-                    <a href="{% url 'collection:adicionar_selo' selo.pk %}"
-                       class="btn btn-outline-primary btn-sm w-100">
-                        <i class="bi bi-plus"></i> Adicionar
-                    </a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% empty %}
-    <div class="col-12">
-        <p class="text-muted">Nenhum selo encontrado.</p>
-    </div>
+<!-- Barra de navegação por ano -->
+{% if anos %}
+<div class="anos-nav">
+    <a href="?q={{ pesquisa }}&tema={{ tema_selecionado }}"
+       class="{% if not ano_selecionado %}active{% endif %}">
+        Todos
+    </a>
+    {% for a in anos %}
+        {% if ano_selecionado %}
+        <a href="?ano={{ a }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
+           class="{% if a|stringformat:'s' == ano_selecionado %}active{% endif %}">
+            {{ a }}
+        </a>
+        {% else %}
+        <a href="#ano-{{ a }}" class="anos-nav-anchor">{{ a }}</a>
+        {% endif %}
     {% endfor %}
 </div>
+{% endif %}
+
+<!-- Contador -->
+<p class="text-muted small mb-3">
+    {% if pagina.paginator.count == 0 %}
+        Nenhum selo encontrado.
+    {% else %}
+        {{ pagina.paginator.count }} selo{{ pagina.paginator.count|pluralize }}
+        {% if ano_selecionado %}de <strong>{{ ano_selecionado }}</strong>{% endif %}
+        — página {{ pagina.number }} de {{ pagina.paginator.num_pages }}
+    {% endif %}
+</p>
+
+<!-- Grelha de selos agrupada por ano -->
+{% regroup selos by ano as grupos_ano %}
+{% for grupo in grupos_ano %}
+
+<div id="ano-{{ grupo.grouper }}" class="mb-2">
+    <div class="d-flex align-items-center gap-2 mb-3" style="border-bottom:1px solid #21262d;padding-bottom:.35rem;">
+        <span style="font-size:.7rem;font-weight:600;letter-spacing:.08em;color:#8b949e;text-transform:uppercase;">{{ grupo.grouper }}</span>
+        <span class="badge" style="background:#21262d;color:#8b949e;font-size:.65rem;">{{ grupo.list|length }} selo{{ grupo.list|length|pluralize }}</span>
+    </div>
+    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
+        {% for selo in grupo.list %}
+        <div class="col">
+            <div class="card h-100 card-selo {% if selo.pk in ids_colecao %}border-success{% endif %}">
+                <a href="{% url 'catalog:selo_detalhe' selo.pk %}">
+                    {% if selo.imagem %}
+                        <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
+                             class="card-img-top img-selo">
+                    {% else %}
+                        <div class="card-img-top img-selo-placeholder d-flex align-items-center
+                                    justify-content-center">
+                            <i class="bi bi-image text-secondary fs-1"></i>
+                        </div>
+                    {% endif %}
+                </a>
+                <div class="card-body p-2">
+                    <p class="card-text small mb-1 fw-semibold">{{ selo.titulo }}</p>
+                    <p class="card-text text-muted" style="font-size:.75rem;">
+                        {{ selo.denominacao }} {{ selo.moeda }}
+                    </p>
+                    <p class="card-text text-muted" style="font-size:.7rem;">
+                        Nº {{ selo.numero_catalogo }}
+                    </p>
+                </div>
+                <div class="card-footer p-2 d-flex gap-1">
+                    {% if selo.pk in ids_colecao %}
+                        <span class="badge bg-success w-100 text-center">
+                            <i class="bi bi-check me-1"></i>Tenho
+                        </span>
+                    {% else %}
+                        <a href="{% url 'collection:adicionar_selo' selo.pk %}"
+                           class="btn btn-outline-primary btn-sm w-100">
+                            <i class="bi bi-plus"></i> Adicionar
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% empty %}
+<p class="text-muted">Nenhum selo encontrado.</p>
+{% endfor %}
+
+<!-- Paginação -->
+{% if pagina.has_other_pages %}
+<nav class="mt-4" aria-label="Paginação">
+    <ul class="pagination justify-content-center flex-wrap">
+        {% if pagina.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?pagina={{ pagina.previous_page_number }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+        {% endif %}
+        {% for num in pagina.paginator.page_range %}
+            {% if pagina.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > pagina.number|add:"-4" and num < pagina.number|add:"4" %}
+            <li class="page-item">
+                <a class="page-link" href="?pagina={{ num }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">{{ num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+        {% if pagina.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?pagina={{ pagina.next_page_number }}&ano={{ ano_selecionado }}&q={{ pesquisa }}&tema={{ tema_selecionado }}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
 {% endblock %}
+

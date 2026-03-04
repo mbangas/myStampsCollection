@@ -3,9 +3,9 @@
 {% block titulo %}Catálogo – Selos do Mundo{% endblock %}
 
 {% block conteudo %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0"><i class="bi bi-globe2 me-2"></i>Catálogo por País</h1>
-    <a href="{% url 'exchange:matches' %}" class="btn btn-outline-warning btn-sm">
+<div class="page-header">
+    <h1><i class="bi bi-globe2 me-2"></i>Catálogo por País</h1>
+    <a href="{% url 'exchange:matches' %}" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-lightning me-1"></i> Ver Matches de Troca
     </a>
 </div>
@@ -43,10 +43,7 @@
                     <img src="{{ pais.bandeira.url }}" alt="Bandeira {{ pais.nome }}"
                          class="mb-2 rounded" style="width:48px;height:32px;object-fit:cover;">
                 {% else %}
-                    <div class="mb-2 bg-secondary rounded d-inline-flex align-items-center
-                                justify-content-center" style="width:48px;height:32px;">
-                        <i class="bi bi-flag text-white small"></i>
-                    </div>
+                    <span class="fi fi-{{ pais.codigo_iso|lower }} mb-2" style="font-size:1.8rem;"></span>
                 {% endif %}
                 <div class="fw-semibold small">{{ pais.nome }}</div>
                 <div class="text-muted" style="font-size:.75rem;">
