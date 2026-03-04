@@ -9,6 +9,7 @@ from django.views.generic import CreateView
 from django.urls import reverse_lazy
 
 from .forms import FormularioRegisto, FormularioEntrada, FormularioPerfil
+from .models import PerfilUtilizador
 
 
 class VistaRegisto(CreateView):
@@ -57,7 +58,7 @@ def vista_sair(request):
 @login_required
 def vista_perfil(request):
     """Mostra e edita o perfil do utilizador autenticado."""
-    perfil = request.user.perfil
+    perfil, _ = PerfilUtilizador.objects.get_or_create(utilizador=request.user)
 
     if request.method == 'POST':
         formulario = FormularioPerfil(request.POST, request.FILES, instance=perfil)
