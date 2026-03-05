@@ -325,120 +325,77 @@ step_install_docker() {
     info "Docker Compose instalado: $(docker compose version)"
 }
 
-# -- Detectar se estamos dentro de um contentor LXC ----------------------------
-_is_in_lxc() {
-    # Metodo 1: cgroup menciona lxc
-    if [[ -r /proc/self/cgroup ]] && grep -qE "lxc|\.lxc" /proc/self/cgroup 2>/dev/null; then
-        return 0
-    fi
-    # Metodo 2: systemd-detect-virt
-    if command -v systemd-detect-virt &>/dev/null; then
-        systemd-detect-virt --container 2>/dev/null | grep -qi "lxc" && return 0
-    fi
-    # Metodo 3: ambiente do processo 1 indica container=lxc
-    if [[ -r /proc/1/environ ]] && \
-       strings /proc/1/environ 2>/dev/null | grep -q "container=lxc"; then
-        return 0
-    fi
-    # Metodo 4: cgroup do PID 1
-    if [[ -r /proc/1/cgroup ]] && grep -qE "lxc|\.lxc" /proc/1/cgroup 2>/dev/null; then
-        return 0
-    fi
-    return 1
+# -- Configurar storage driver do Docker para Proxmox LXC ---------------------
+# Limpa o estado anterior e reinicia o Docker de raiz.
+# Se overlay2 funcionar (LXC com nesting=1) usa overlay2.
+# Se falhar com MS_PRIVATE (sem nesting), faz fallback automatico para vfs.
+step_fix_lxc_overlay() {
+    info "A configurar storage driver para Proxmox LXC..."
+
+    # Parar Docker e limpar estado de tentativas anteriores
+    systemctl stop docker docker.socket 2>/dev/null            >> "$LOG" 2>&1 || true
+    systemctl stop containerd                                  >> "$LOG" 2>&1 || true
+    sleep 3
+    info "A limpar dados anteriores do Docker..."
+    rm -rf /var/lib/docker/* /var/lib/containerd/*
+    log "Dados anteriores removidos"
+
+    # Remover daemon.json de tentativas anteriores para deixar Docker
+    # usar overlay2 por omissao (funciona em LXC com nesting=1)
+    rm -f /etc/docker/daemon.json
+    log "daemon.json removido -- Docker vai usar driver por omissao (overlay2)"
+
+    # Iniciar Docker
+    info "A iniciar Docker..."
+    systemctl start containerd                                 >> "$LOG" 2>&1
+    sleep 3
+    systemctl start docker                                     >> "$LOG" 2>&1
+    sleep 5
+
+    local active_driver
+    active_driver=$(docker info --format '{{.Driver}}' 2>/dev/null || echo "?")
+    info "Storage driver activo: ${active_driver}"
+    log "Storage driver inicial: ${active_driver}"
 }
 
-# -- Reconfigurar Docker para correr correctamente dentro de LXC ---------------
-_fix_docker_for_lxc() {
-    info "A aplicar configuracoes de compatibilidade Docker-LXC..."
+# -- Mostrar erro de nesting Proxmox e parar -----------------------------------
+_fail_nesting() {
+    local detail="${1:-}"
+    log "ERRO nesting: ${detail}"
 
-    local daemon_json="/etc/docker/daemon.json"
-    mkdir -p /etc/docker
+    echo "" >&2
+    echo "======================================================================" >&2
+    echo "  ERRO: Docker nao pode arrancar contentores neste LXC"                >&2
+    echo "======================================================================" >&2
+    echo "" >&2
+    echo "  Causa: o LXC Proxmox nao tem a opcao 'nesting' activa."             >&2
+    echo "  Sem ela, o Docker nao consegue correr NENHUM contentor."            >&2
+    echo "" >&2
+    echo "  SOLUCAO -- executar NO HOST PROXMOX:"                               >&2
+    echo "" >&2
+    echo "    1. Ver o ID deste LXC:"                                            >&2
+    echo "         pct list"                                                      >&2
+    echo "" >&2
+    echo "    2. Activar nesting (substituir XXX pelo ID do LXC):"              >&2
+    echo "         pct set XXX --features nesting=1,keyctl=1"                    >&2
+    echo "" >&2
+    echo "    3. Reiniciar o LXC:"                                               >&2
+    echo "         pct stop XXX && pct start XXX"                                >&2
+    echo "" >&2
+    echo "    4. Voltar a executar o instalador dentro do LXC:"                 >&2
+    echo "         bash install.sh"                                               >&2
+    echo "" >&2
+    echo "  Alternativa (interface Proxmox):"                                    >&2
+    echo "    Container > Options > Features > Nesting (activar checkmark)"      >&2
+    echo "" >&2
 
-    # Parar Docker antes de alterar a configuracao
-    systemctl stop docker >> "$LOG" 2>&1 || true
-    sleep 2
-
-    # Tentar instalar fuse-overlayfs (suporte overlay2 sem modulo kernel)
-    info "A tentar instalar fuse-overlayfs..."
-    if apt-get install -y -qq fuse-overlayfs >> "$LOG" 2>&1; then
-        info "fuse-overlayfs instalado -- a configurar overlay2..."
-        cat > "$daemon_json" <<'DAEMON_EOF'
-{
-  "storage-driver": "overlay2",
-  "storage-opts": ["overlay2.override_kernel_check=true"]
-}
-DAEMON_EOF
-    else
-        # fuse-overlayfs nao disponivel -- usar vfs como alternativa segura
-        info "fuse-overlayfs indisponivel -- a usar driver vfs..."
-        cat > "$daemon_json" <<'DAEMON_EOF'
-{
-  "storage-driver": "vfs"
-}
-DAEMON_EOF
-    fi
-
-    log "daemon.json: $(cat $daemon_json)"
-
-    # Recarregar systemd e reiniciar Docker
-    systemctl daemon-reload >> "$LOG" 2>&1 || true
-    systemctl start docker  >> "$LOG" 2>&1
-
-    # Aguardar arranque
-    local w=0
-    while ! docker info &>/dev/null; do
-        sleep 2; w=$((w + 2))
-        printf "\r  Aguardar Docker apos reconfiguracoes... %ds" "$w"
-        if (( w >= 30 )); then break; fi
-    done
-    [[ $w -gt 0 ]] && echo ""
-    info "Docker reiniciado com novo perfil de armazenamento."
-}
-
-# -- Verificar suporte a Docker (com self-healing para LXC) --------------------
-check_docker_works() {
-    info "A verificar se Docker consegue correr contentores..."
-    local waited=0
-    while ! docker info &>/dev/null; do
-        sleep 2; waited=$((waited + 2))
-        printf "\r  Aguardar Docker... %ds" "$waited"
-        if (( waited >= 60 )); then
-            echo ""; log "ERRO: Docker nao disponivel apos 60s"; return 1
-        fi
-    done
-    [[ $waited -gt 0 ]] && echo ""
-
-    # Primeira tentativa
-    if docker run --rm hello-world >> "$LOG" 2>&1; then
-        info "Docker a funcionar correctamente."
-        return 0
-    fi
-
-    log "AVISO: docker run hello-world falhou na primeira tentativa"
-
-    # Self-healing: reconfigurar automaticamente se estivermos em LXC
-    if _is_in_lxc; then
-        info "Ambiente LXC detectado -- a corrigir configuracao Docker automaticamente..."
-        _fix_docker_for_lxc
-
-        info "A verificar Docker apos reconfiguracoes..."
-        if docker run --rm hello-world >> "$LOG" 2>&1; then
-            info "Docker configurado com sucesso para ambiente LXC."
-            return 0
-        fi
-        log "AVISO: Docker ainda nao funcional apos reconfiguracoes automaticas"
-    fi
-
-    # Nao foi possivel corrigir automaticamente -- mostrar instrucoes
-    log "AVISO: docker run hello-world falhou -- pode ser LXC sem nesting"
     whiptail \
         --backtitle "myStampsCollection Installer  v1.0" \
         --title "Configuracao Proxmox Necessaria" \
         --msgbox \
 "O Docker nao consegue correr contentores.
 
-A opcao 'nesting' nao esta activa neste LXC
-(ou o kernel do host nao suporta overlay2).
+A opcao 'nesting' nao esta activa neste LXC.
 
 SOLUCAO -- no HOST Proxmox:
 
@@ -457,10 +414,60 @@ SOLUCAO -- no HOST Proxmox:
 Alternativa (interface Proxmox):
   Container > Options > Features
   -> activar 'Nesting'" \
-        28 64 \
+        26 64 \
         </dev/tty >/dev/tty 2>/dev/null || true
 
     exit 1
+}
+
+# -- Verificar que o Docker consegue arrancar contentores ----------------------
+# Testa com --pull=never (sem rede) para detectar MS_PRIVATE (falta de nesting).
+# Se MS_PRIVATE detectado: fallback automatico para vfs e re-teste.
+# So pede intervencao manual se ainda falhar apos fallback.
+check_docker_works() {
+    info "A verificar compatibilidade Docker/LXC..."
+
+    local cur_driver
+    cur_driver=$(docker info --format '{{.Driver}}' 2>/dev/null || echo "?")
+    info "Storage driver: ${cur_driver}"
+    log "Storage driver em uso: ${cur_driver}"
+
+    # Testar nesting: usar imagem hello-world se ja estiver em cache
+    info "A verificar permissoes do LXC (nesting)..."
+    local nest_err
+    nest_err=$(docker run --rm --pull=never hello-world 2>&1) || true
+
+    if echo "$nest_err" | grep -qi "Unable to find image\|No such image"; then
+        # Imagem nao em cache -- nao e erro de nesting, pode prosseguir
+        log "check_docker_works: imagem local ausente -- verificacao de nesting ignorada"
+        info "Verificacao de nesting ignorada (imagem local ausente)."
+        return 0
+    fi
+
+    if echo "$nest_err" | grep -q "MS_PRIVATE\|remount-private"; then
+        # MS_PRIVATE com overlay2 -> fallback automatico para vfs
+        info "MS_PRIVATE detectado com driver ${cur_driver} -- a tentar fallback vfs..."
+        log "MS_PRIVATE com driver=${cur_driver}: ${nest_err}"
+
+        systemctl stop docker docker.socket containerd 2>/dev/null >> "$LOG" 2>&1 || true
+        sleep 3
+        rm -rf /var/lib/docker/* /var/lib/containerd/*
+        mkdir -p /etc/docker
+        printf '{\n  "storage-driver": "vfs"\n}\n' > /etc/docker/daemon.json
+        systemctl start containerd >> "$LOG" 2>&1; sleep 3
+        systemctl start docker     >> "$LOG" 2>&1; sleep 5
+        cur_driver=$(docker info --format '{{.Driver}}' 2>/dev/null || echo "?")
+        info "Storage driver apos fallback: ${cur_driver}"
+
+        # Re-testar; se ainda MS_PRIVATE -> nesting mesmo nao activo
+        nest_err=$(docker run --rm --pull=never hello-world 2>&1) || true
+        if echo "$nest_err" | grep -q "MS_PRIVATE\|remount-private"; then
+            _fail_nesting "$nest_err"
+        fi
+    fi
+
+    info "LXC OK -- Docker consegue correr contentores."
+    log "check_docker_works: OK"
 }
 
 # -- PASSO 3: Clonar repositorio ------------------------------------------------
@@ -675,7 +682,10 @@ step_update_system
 progress 20  "A instalar Docker CE..."
 step_install_docker
 
-progress 35  "A verificar suporte Docker..."
+progress 32  "A configurar storage driver (Proxmox LXC)..."
+step_fix_lxc_overlay
+
+progress 36  "A verificar compatibilidade Docker/LXC..."
 check_docker_works
 
 progress 45  "A descarregar repositorio..."
