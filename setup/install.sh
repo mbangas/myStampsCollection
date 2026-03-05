@@ -325,7 +325,77 @@ step_install_docker() {
     info "Docker Compose instalado: $(docker compose version)"
 }
 
-# -- Verificar suporte a Docker -------------------------------------------------
+# -- Detectar se estamos dentro de um contentor LXC ----------------------------
+_is_in_lxc() {
+    # Metodo 1: cgroup menciona lxc
+    if [[ -r /proc/self/cgroup ]] && grep -qE "lxc|\.lxc" /proc/self/cgroup 2>/dev/null; then
+        return 0
+    fi
+    # Metodo 2: systemd-detect-virt
+    if command -v systemd-detect-virt &>/dev/null; then
+        systemd-detect-virt --container 2>/dev/null | grep -qi "lxc" && return 0
+    fi
+    # Metodo 3: ambiente do processo 1 indica container=lxc
+    if [[ -r /proc/1/environ ]] && \
+       strings /proc/1/environ 2>/dev/null | grep -q "container=lxc"; then
+        return 0
+    fi
+    # Metodo 4: cgroup do PID 1
+    if [[ -r /proc/1/cgroup ]] && grep -qE "lxc|\.lxc" /proc/1/cgroup 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+# -- Reconfigurar Docker para correr correctamente dentro de LXC ---------------
+_fix_docker_for_lxc() {
+    info "A aplicar configuracoes de compatibilidade Docker-LXC..."
+
+    local daemon_json="/etc/docker/daemon.json"
+    mkdir -p /etc/docker
+
+    # Parar Docker antes de alterar a configuracao
+    systemctl stop docker >> "$LOG" 2>&1 || true
+    sleep 2
+
+    # Tentar instalar fuse-overlayfs (suporte overlay2 sem modulo kernel)
+    info "A tentar instalar fuse-overlayfs..."
+    if apt-get install -y -qq fuse-overlayfs >> "$LOG" 2>&1; then
+        info "fuse-overlayfs instalado -- a configurar overlay2..."
+        cat > "$daemon_json" <<'DAEMON_EOF'
+{
+  "storage-driver": "overlay2",
+  "storage-opts": ["overlay2.override_kernel_check=true"]
+}
+DAEMON_EOF
+    else
+        # fuse-overlayfs nao disponivel -- usar vfs como alternativa segura
+        info "fuse-overlayfs indisponivel -- a usar driver vfs..."
+        cat > "$daemon_json" <<'DAEMON_EOF'
+{
+  "storage-driver": "vfs"
+}
+DAEMON_EOF
+    fi
+
+    log "daemon.json: $(cat $daemon_json)"
+
+    # Recarregar systemd e reiniciar Docker
+    systemctl daemon-reload >> "$LOG" 2>&1 || true
+    systemctl start docker  >> "$LOG" 2>&1
+
+    # Aguardar arranque
+    local w=0
+    while ! docker info &>/dev/null; do
+        sleep 2; w=$((w + 2))
+        printf "\r  Aguardar Docker apos reconfiguracoes... %ds" "$w"
+        if (( w >= 30 )); then break; fi
+    done
+    [[ $w -gt 0 ]] && echo ""
+    info "Docker reiniciado com novo perfil de armazenamento."
+}
+
+# -- Verificar suporte a Docker (com self-healing para LXC) --------------------
 check_docker_works() {
     info "A verificar se Docker consegue correr contentores..."
     local waited=0
@@ -338,15 +408,37 @@ check_docker_works() {
     done
     [[ $waited -gt 0 ]] && echo ""
 
-    if ! docker run --rm hello-world >> "$LOG" 2>&1; then
-        log "AVISO: docker run hello-world falhou -- pode ser LXC sem nesting"
-        whiptail \
-            --backtitle "myStampsCollection Installer  v1.0" \
-            --title "Configuracao Proxmox Necessaria" \
-            --msgbox \
+    # Primeira tentativa
+    if docker run --rm hello-world >> "$LOG" 2>&1; then
+        info "Docker a funcionar correctamente."
+        return 0
+    fi
+
+    log "AVISO: docker run hello-world falhou na primeira tentativa"
+
+    # Self-healing: reconfigurar automaticamente se estivermos em LXC
+    if _is_in_lxc; then
+        info "Ambiente LXC detectado -- a corrigir configuracao Docker automaticamente..."
+        _fix_docker_for_lxc
+
+        info "A verificar Docker apos reconfiguracoes..."
+        if docker run --rm hello-world >> "$LOG" 2>&1; then
+            info "Docker configurado com sucesso para ambiente LXC."
+            return 0
+        fi
+        log "AVISO: Docker ainda nao funcional apos reconfiguracoes automaticas"
+    fi
+
+    # Nao foi possivel corrigir automaticamente -- mostrar instrucoes
+    log "AVISO: docker run hello-world falhou -- pode ser LXC sem nesting"
+    whiptail \
+        --backtitle "myStampsCollection Installer  v1.0" \
+        --title "Configuracao Proxmox Necessaria" \
+        --msgbox \
 "O Docker nao consegue correr contentores.
 
-A opcao 'nesting' nao esta activa neste LXC.
+A opcao 'nesting' nao esta activa neste LXC
+(ou o kernel do host nao suporta overlay2).
 
 SOLUCAO -- no HOST Proxmox:
 
@@ -365,12 +457,10 @@ SOLUCAO -- no HOST Proxmox:
 Alternativa (interface Proxmox):
   Container > Options > Features
   -> activar 'Nesting'" \
-            26 64 \
-            </dev/tty >/dev/tty 2>/dev/null || true
+        28 64 \
+        </dev/tty >/dev/tty 2>/dev/null || true
 
-        exit 1
-    fi
-    info "Docker a funcionar correctamente."
+    exit 1
 }
 
 # -- PASSO 3: Clonar repositorio ------------------------------------------------
