@@ -51,7 +51,15 @@
                 </ul>
             </nav>
 
-            <div class="gh-user-area ms-auto gh-dropdown">
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                {% if user.perfil.is_admin %}
+                <span style="background:#1f6feb;color:#fff;font-size:.55rem;font-weight:700;
+                             padding:2px 6px;border-radius:10px;letter-spacing:.04em;
+                             text-transform:uppercase;line-height:1;white-space:nowrap;">
+                    Admin
+                </span>
+                {% endif %}
+                <div class="gh-user-area gh-dropdown">
                 <button class="gh-user-btn">
                     {% if user.perfil.avatar %}
                         <img src="{{ user.perfil.avatar.url }}" alt="Avatar"
@@ -72,8 +80,9 @@
                     </a>
                 </div>
             </div>
+            </div>
 
-            <button class="gh-toggler" id="gh-toggler" aria-label="Menu">
+                        <button class="gh-toggler" id="gh-toggler" aria-label="Menu">
                 <i class="bi bi-list" style="font-size:1.2rem;"></i>
             </button>
             {% endif %}

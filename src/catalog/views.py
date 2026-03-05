@@ -6,6 +6,7 @@ import threading
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import F, Q, Count, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -13,6 +14,14 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import DetailView, ListView
+
+
+def _utilizador_e_admin(request: HttpRequest) -> bool:
+    """Devolve True se o utilizador autenticado é administrador."""
+    try:
+        return bool(request.user.perfil.is_admin)
+    except Exception:
+        return False
 
 from .models import ImportacaoCatalogo, Pais, Selo, Serie, Tema, Variante
 
@@ -202,7 +211,9 @@ def vista_upload_imagem_selo(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 def vista_criar_pais(request: HttpRequest) -> HttpResponse:
-    """Cria um novo país/zona no catálogo via AJAX."""
+    """Cria um novo país/zona no catálogo via AJAX. Restrito ao administrador."""
+    if not _utilizador_e_admin(request):
+        return JsonResponse({'error': 'Acesso restrito ao administrador.'}, status=403)
     if request.method != 'POST':
         return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
@@ -253,7 +264,9 @@ def vista_editar_descricao_pais(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 def vista_iniciar_importacao_stampdata(request: HttpRequest) -> JsonResponse:
-    """Inicia uma importação do StampData em background para o país especificado."""
+    """Inicia uma importação do StampData em background. Restrito ao administrador."""
+    if not _utilizador_e_admin(request):
+        return JsonResponse({'error': 'Acesso restrito ao administrador.'}, status=403)
     if request.method != 'POST':
         return JsonResponse({'error': 'Método não permitido.'}, status=405)
 
@@ -355,3 +368,33 @@ def vista_estado_importacao(request: HttpRequest) -> JsonResponse:
         'concluido_em': importacao.concluido_em.isoformat() if importacao.concluido_em else None,
         'a_correr': importacao.estado == ImportacaoCatalogo.ESTADO_A_CORRER,
     })
+
+
+@login_required
+def vista_confirmar_apagar_pais(request: HttpRequest, pk: int) -> HttpResponse:
+    """Confirmação e execução de remoção de um catálogo de país. Restrito ao administrador."""
+    if not _utilizador_e_admin(request):
+        messages.error(request, 'Acesso restrito ao administrador.')
+        return redirect('catalog:catalogo')
+
+    pais = get_object_or_404(Pais, pk=pk)
+
+    if request.method == 'POST':
+        nome = pais.nome
+        with transaction.atomic():
+            # Eliminar registos dependentes (todos com on_delete=PROTECT)
+            from exchange.models import OfertaTroca, PedidoTroca
+            from collection.models import ItemColecao
+
+            selos_ids = list(pais.selos.values_list('pk', flat=True))
+            OfertaTroca.objects.filter(selo_id__in=selos_ids).delete()
+            PedidoTroca.objects.filter(selo_id__in=selos_ids).delete()
+            ItemColecao.objects.filter(stamp_id__in=selos_ids).delete()
+            pais.selos.all().delete()
+            pais.series.all().delete()
+            pais.delete()
+
+        messages.success(request, f'Catálogo "{nome}" apagado com sucesso.')
+        return redirect('catalog:catalogo')
+
+    return render(request, 'catalog/confirmar_apagar_pais.html', {'pais': pais})

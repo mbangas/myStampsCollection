@@ -33,6 +33,11 @@ class PerfilUtilizador(models.Model):
         verbose_name='Países de Interesse',
     )
     data_registo = models.DateTimeField(auto_now_add=True, verbose_name='Data de Registo')
+    is_admin = models.BooleanField(
+        default=False,
+        verbose_name='Administrador',
+        help_text='O primeiro utilizador registado é automaticamente o administrador.',
+    )
 
     class Meta:
         verbose_name = 'Perfil do Utilizador'
@@ -58,9 +63,13 @@ class PerfilUtilizador(models.Model):
 
 @receiver(post_save, sender=User)
 def criar_perfil_utilizador(sender: type, instance: User, created: bool, **kwargs) -> None:
-    """Cria automaticamente um perfil ao registar um utilizador."""
+    """Cria automaticamente um perfil ao registar um utilizador.
+
+    O primeiro utilizador registado torna-se administrador automaticamente.
+    """
     if created:
-        PerfilUtilizador.objects.create(utilizador=instance)
+        is_admin = User.objects.count() == 1
+        PerfilUtilizador.objects.create(utilizador=instance, is_admin=is_admin)
 
 
 @receiver(post_save, sender=User)

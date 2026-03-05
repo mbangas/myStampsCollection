@@ -111,6 +111,7 @@
 <div class="mapa-popup" id="mapa-popup"></div>
 
 <!-- Modal para criar novo catálogo de país/zona -->
+{% if user.perfil.is_admin %}
 <div class="modal fade" id="modal-criar-pais" tabindex="-1" aria-labelledby="modal-criar-pais-label" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="background:#161b22;border-color:#30363d;color:#e6edf3;">
@@ -208,6 +209,7 @@
         </div>
     </div>
 </div>
+{% endif %}{# user.perfil.is_admin #}
 
 <!-- Pesquisa reativa -->
 <form method="get" class="mb-4" id="form-pesquisa" autocomplete="off">
@@ -266,7 +268,10 @@
 </div>
 
 <!-- Dados do servidor para o mapa -->
-<script>const PAISES_DATA = {{ paises_json|safe }};</script>
+<script>
+    const PAISES_DATA = {{ paises_json|safe }};
+    const USUARIO_ADMIN = {{ user.perfil.is_admin|yesno:"true,false" }};
+</script>
 {% endblock %}
 
 {% block js_extra %}
@@ -460,16 +465,20 @@ if (inputPesquisa) {
             html += `<a href="${catalogData.url}" class="btn btn-sm btn-primary">
                         <i class="bi bi-eye me-1"></i>Ver Catálogo
                      </a>`;
-            html += `<button class="btn btn-sm btn-outline-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="${catalogData.pk || ''}">
-                        <i class="bi bi-plus-lg me-1"></i>Criar Novo Catálogo
-                     </button>`;
+            if (USUARIO_ADMIN) {
+                html += `<button class="btn btn-sm btn-outline-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="${catalogData.pk || ''}">
+                            <i class="bi bi-plus-lg me-1"></i>Criar Novo Catálogo
+                         </button>`;
+            }
             html += `</div>`;
         } else {
             html += `<div class="popup-info">Sem catálogo</div>`;
             html += `<div class="popup-actions">`;
-            html += `<button class="btn btn-sm btn-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="">
-                        <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
-                     </button>`;
+            if (USUARIO_ADMIN) {
+                html += `<button class="btn btn-sm btn-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="">
+                            <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
+                         </button>`;
+            }
             html += `</div>`;
         }
 
@@ -513,7 +522,8 @@ if (inputPesquisa) {
     document.getElementById('mapa-mundo').style.display = 'none';
 });
 
-/* ═══ Modal – Criar novo catálogo ════════════════════════════════ */
+/* ═══ Modal – Criar novo catálogo (apenas administrador) ════════ */
+if (USUARIO_ADMIN) {
 const _modalCriarPaisEl = document.getElementById('modal-criar-pais');
 
 function abrirModalCriarPais(nome, iso, paisPkExistente) {
@@ -708,5 +718,6 @@ document.getElementById('modal-criar-pais').addEventListener('show.bs.modal', as
         }
     } catch (_) {}
 });
+} // end if (USUARIO_ADMIN)
 </script>
 {% endblock %}
