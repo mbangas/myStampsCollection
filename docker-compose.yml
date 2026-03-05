@@ -61,11 +61,23 @@ services:
     networks:
       - stamps_network
 
+  # ── Portainer (gestão Docker via interface web) ────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: stamps_portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
 # ── Volumes persistentes ───────────────────────────────────────────────────────
 volumes:
   postgres_data:
   media_data:
   static_data:
+  portainer_data:
 
 # ── Rede interna ───────────────────────────────────────────────────────────────
 networks:

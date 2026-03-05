@@ -23,6 +23,7 @@ readonly LOG="/tmp/mystamps_install_$(date +%Y%m%d_%H%M%S).log"
 
 APP_DIR="/opt/mystamps"
 APP_PORT="80"
+PORTAINER_PORT="9000"
 DB_PASSWORD=""
 SECRET_KEY=""
 
@@ -574,8 +575,15 @@ step_build_and_start() {
 
     echo ""
     info "Build concluido. A iniciar servicos..."
-    docker compose -f docker-compose.yml up -d              >> "$LOG" 2>&1
+    docker compose -f docker-compose.yml up -d              2>&1 | tee -a "$LOG"
     info "Todos os servicos iniciados."
+
+    # Dar uns segundos para os containers arrancar e mostrar o estado
+    sleep 5
+    echo ""
+    info "Estado dos contentores apos arranque:"
+    docker compose -f docker-compose.yml ps                 2>&1 | tee -a "$LOG"
+    echo ""
 }
 
 # -- Verificar saude dos servicos ----------------------------------------------
@@ -719,6 +727,7 @@ printf '  Instalado em: %s\n' "$(date)"                                         
 printf '======================================================================\n'       >> "$_SUMMARY"
 printf '\n'                                                                             >> "$_SUMMARY"
 printf '  Aplicacao  -->  http://%s:%s\n'  "$_FINAL_IP" "$APP_PORT"                   >> "$_SUMMARY"
+printf '  Portainer  -->  http://%s:%s\n'  "$_FINAL_IP" "$PORTAINER_PORT"             >> "$_SUMMARY"
 printf '\n'                                                                             >> "$_SUMMARY"
 printf '  COMANDOS UTEIS:\n'                                                           >> "$_SUMMARY"
 printf '    Actualizar:     mystamps-update\n'                                         >> "$_SUMMARY"
@@ -738,6 +747,7 @@ printf '  myStampsCollection -- INSTALACAO CONCLUIDA!\n'
 printf '======================================================================\n'
 printf '\n'
 printf '  Aplicacao  -->  http://%s:%s\n'  "$_FINAL_IP" "$APP_PORT"
+printf '  Portainer  -->  http://%s:%s\n'  "$_FINAL_IP" "$PORTAINER_PORT"
 printf '\n'
 printf '  Para actualizar no futuro: mystamps-update\n'
 printf '  (Resumo guardado em: %s)\n' "$_SUMMARY"
