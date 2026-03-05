@@ -66,6 +66,29 @@
     margin: 0 auto;
 }
 
+/* ── Decade jump buttons ────────────────────────────────────── */
+.decada-btn {
+    font-size: .6rem;
+    font-weight: 700;
+    color: #58a6ff;
+    padding: 3px 2px;
+    width: 100%;
+    text-align: center;
+    cursor: pointer;
+    border: none;
+    border-top: 1px solid rgba(88,166,255,.3);
+    background: rgba(88,166,255,.1);
+    border-radius: 3px;
+    transition: color .12s, background .12s;
+    letter-spacing: .04em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.decada-btn:hover {
+    background: rgba(88,166,255,.25);
+    color: #a5d0ff;
+}
+
 /* ── Card com checkmark em vez de borda ─────────────────────── */
 .card-selo-colecao {
     position: relative;
@@ -361,6 +384,31 @@ window.addEventListener('scroll', () => {
     else btnTopo.classList.remove('visivel');
 }, { passive: true });
 btnTopo.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+/* ── Decade jump buttons (inserted dynamically) ─────────────── */
+(function addDecadeButtons() {
+    const timeline = document.getElementById('ano-timeline');
+    if (!timeline) return;
+    const anoBtns = Array.from(timeline.querySelectorAll('.ano-btn'));
+    let lastDecade = null;
+    anoBtns.forEach(btn => {
+        const ano = parseInt(btn.dataset.ano, 10);
+        const decada = Math.floor(ano / 10) * 10;
+        if (decada !== lastDecade) {
+            lastDecade = decada;
+            const decadaBtn = document.createElement('button');
+            decadaBtn.className = 'decada-btn';
+            decadaBtn.textContent = decada + 's';
+            decadaBtn.title = `Saltar para os anos ${decada}`;
+            decadaBtn.dataset.href = btn.dataset.href;
+            decadaBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                window.location.href = decadaBtn.dataset.href;
+            });
+            timeline.insertBefore(decadaBtn, btn);
+        }
+    });
+})();
 
 /* ── Highlight do año ativo na timeline via IntersectionObserver */
 const anoTimeline = document.getElementById('ano-timeline');
