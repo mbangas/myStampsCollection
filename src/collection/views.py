@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from catalog.models import Pais, Selo
 from .forms import FormularioItemColecao, FormularioLocalizacaoBulk
 from .models import ItemColecao
+from .pdf_faltas import gerar_pdf_faltas
 
 
 @login_required
@@ -153,4 +154,16 @@ def atualizar_localizacao_bulk(request: HttpRequest) -> HttpResponse:
             messages.error(request, 'Formulário inválido.')
 
     return redirect('collection:colecao')
+
+
+@login_required
+def exportar_faltas_pdf(request: HttpRequest, pais_id: int) -> HttpResponse:
+    """Exporta para PDF a lista de selos em falta para um país."""
+    pais = get_object_or_404(Pais, pk=pais_id)
+    pdf_bytes = gerar_pdf_faltas(request.user, pais)
+
+    nome_ficheiro = f'faltas_{pais.codigo_iso.lower()}.pdf'
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{nome_ficheiro}"'
+    return response
 

@@ -137,10 +137,17 @@ tr.selecionado { background: rgba(31,111,235,.07) !important; }
 <div class="mb-4">
     <div class="section-label d-flex justify-content-between align-items-center">
         <span><i class="bi bi-flag"></i> {{ grupo.grouper }}</span>
-        <button type="button" class="btn btn-outline-secondary btn-sm py-0"
-                onclick="selecionarGrupo(this)" style="font-size:.72rem;">
-            Selecionar todos
-        </button>
+        <div class="d-flex gap-1">
+            <a href="{% url 'collection:exportar_faltas_pdf' grupo.list.0.stamp.pais.id %}"
+               class="btn btn-outline-info btn-sm py-0" style="font-size:.72rem;"
+               title="Exportar lista de faltas em PDF">
+                <i class="bi bi-file-earmark-pdf me-1"></i>Faltas PDF
+            </a>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0"
+                    onclick="selecionarGrupo(this)" style="font-size:.72rem;">
+                Selecionar todos
+            </button>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">

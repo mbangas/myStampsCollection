@@ -12,4 +12,5 @@ urlpatterns = [
     path('editar/<int:pk>/', views.editar_item, name='editar_item'),
     path('remover/<int:pk>/', views.remover_item, name='remover_item'),
     path('atualizar-localizacao/', views.atualizar_localizacao_bulk, name='atualizar_localizacao_bulk'),
+    path('faltas/<int:pais_id>/pdf/', views.exportar_faltas_pdf, name='exportar_faltas_pdf'),
 ]

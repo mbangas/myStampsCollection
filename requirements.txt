@@ -6,6 +6,7 @@ django-crispy-forms==2.1
 crispy-bootstrap5==2024.2
 whitenoise==6.6.0
 gunicorn==21.2.0
+reportlab==4.4.10
 # Web scraping (usado pelo script tools/importar_selos_portugal.py)
 requests==2.31.0
 beautifulsoup4==4.12.3
