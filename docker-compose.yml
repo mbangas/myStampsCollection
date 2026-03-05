@@ -5,6 +5,7 @@ services:
     image: postgres:16-alpine
     container_name: stamps_db
     restart: unless-stopped
+    privileged: true
     volumes:
       - postgres_data:/var/lib/postgresql/data
     env_file:
@@ -30,6 +31,7 @@ services:
       target: runtime
     container_name: stamps_web
     restart: unless-stopped
+    privileged: true
     depends_on:
       db:
         condition: service_healthy
@@ -50,6 +52,7 @@ services:
     image: nginx:1.27-alpine
     container_name: stamps_nginx
     restart: unless-stopped
+    privileged: true
     depends_on:
       - web
     ports:
@@ -66,6 +69,7 @@ services:
     image: portainer/portainer-ce:latest
     container_name: stamps_portainer
     restart: unless-stopped
+    privileged: true
     ports:
       - "9000:9000"
     volumes:

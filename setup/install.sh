@@ -476,8 +476,53 @@ check_docker_works() {
         fi
     fi
 
+    if echo "$nest_err" | grep -q "ip_unprivileged_port_start"; then
+        # Restricao sysctl do LXC -- nao e fatal porque docker-compose usa
+        # privileged:true; apenas avisar o utilizador.
+        _warn_sysctl_lxc "$nest_err"
+    fi
+
     info "LXC OK -- Docker consegue correr contentores."
     log "check_docker_works: OK"
+}
+
+# -- Mostrar aviso Proxmox LXC sysctl (nao fatal) -------------------------------
+# runc moderno tenta escrever net.ipv4.ip_unprivileged_port_start no namespace
+# de rede de cada contentor; o LXC bloqueia essa escrita.
+# O docker-compose ja usa privileged:true como workaround automatico.
+# Esta funcao apenas avisa o utilizador da causa e da solucao "limpa" no host.
+_warn_sysctl_lxc() {
+    local detail="${1:-}"
+    log "AVISO sysctl LXC: ${detail}"
+
+    echo "" >&2
+    echo "======================================================================" >&2
+    echo "  AVISO: restricao sysctl no LXC Proxmox detectada" >&2
+    echo "======================================================================" >&2
+    echo "" >&2
+    echo "  Causa: o runc nao consegue escrever 'net.ipv4.ip_unprivileged_port_start'" >&2
+    echo "  no namespace de rede dos contentores (restricao do LXC Proxmox)." >&2
+    echo "" >&2
+    echo "  Workaround automatico: os servicos correm com 'privileged: true'" >&2
+    echo "  (ja configurado no docker-compose.yml)." >&2
+    echo "" >&2
+    echo "  Solucao definitiva (sem privileged) -- NO HOST PROXMOX:" >&2
+    echo "" >&2
+    echo "    1. Ver o ID deste LXC:" >&2
+    echo "         pct list" >&2
+    echo "" >&2
+    echo "    2. Editar o ficheiro de config do LXC (mudar XXX pelo ID):" >&2
+    echo "         nano /etc/pve/lxc/XXX.conf" >&2
+    echo "" >&2
+    echo "    3. Adicionar a linha:" >&2
+    echo "         lxc.sysctl.net.ipv4.ip_unprivileged_port_start = 0" >&2
+    echo "" >&2
+    echo "    4. Reiniciar o LXC:" >&2
+    echo "         pct stop XXX && pct start XXX" >&2
+    echo "" >&2
+    echo "  Depois disso pode remover 'privileged: true' do docker-compose.yml." >&2
+    echo "" >&2
+    log "AVISO sysctl: privileged:true em uso como workaround"
 }
 
 # -- PASSO 3: Clonar repositorio ------------------------------------------------
