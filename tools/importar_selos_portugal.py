@@ -14,6 +14,7 @@ O script guarda cache JSON em tools/cache_stampdata/ para poder
 recomeçar se for interrompido.
 """
 
+import argparse
 import json
 import os
 import re
@@ -625,9 +626,28 @@ def importar_selos(detalhes: list[dict], portugal: Pais) -> tuple[int, int, int]
 
 def main() -> None:
     """Função principal que orquestra o processo de importação."""
+    parser = argparse.ArgumentParser(
+        description="Importa selos portugueses a partir do StampData."
+    )
+    parser.add_argument(
+        "--pular-se-populado",
+        action="store_true",
+        help="Salta a importação se Portugal já tem selos na base de dados.",
+    )
+    args = parser.parse_args()
+
     print("=" * 60)
     print("  Importação de Selos Portugueses – StampData.com")
     print("=" * 60)
+
+    if args.pular_se_populado:
+        from django.db.models import Q
+        count = Selo.objects.filter(pais__codigo_iso="PT").filter(
+            Q(numero_catalogo__startswith="SD-") | Q(numero_catalogo__startswith="Sc ")
+        ).count()
+        if count > 0:
+            print(f"  ℹ BD já tem {count} selos StampData de Portugal. A saltar importação.")
+            return
 
     criar_diretorios_cache()
 

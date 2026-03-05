@@ -36,6 +36,14 @@ python manage.py migrate --noinput
 echo "📦 A recolher ficheiros estáticos…"
 python manage.py collectstatic --noinput --clear
 
+# ── Catálogo Portugal (importa a partir do cache StampData) ───────────────────
+echo "📋 A importar catálogo de selos (Portugal/StampData)…"
+python -u tools/importar_selos_portugal.py --pular-se-populado
+
+# ── Dados em background: imagens PT → catálogo ES → imagens ES ────────────────
+echo "⏳ A lançar carregamento de dados em background (PT imagens → ES catálogo → ES imagens)…"
+sh /app/docker/carregar_dados_bg.sh &
+
 # ── Inicia o servidor Gunicorn ────────────────────────────────────────────────
 echo "🚀 A iniciar Gunicorn…"
 exec gunicorn stamps_config.wsgi:application \

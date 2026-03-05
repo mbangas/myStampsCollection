@@ -1,7 +1,137 @@
-# myStampsCollection 🌍📮
+# myStampsCollection
 
-Sistema web para gerir coleções de selos filatélicos de todo o mundo, com catálogo por país, gestão de coleção pessoal e zona de trocas entre utilizadores.
+> Sistema web para gerir coleções de selos filatélicos de todo o mundo, com catálogo por país, gestão de coleção pessoal e zona de trocas entre utilizadores.
 
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
+![Version](https://img.shields.io/badge/version-1.0-blue)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
+## O que é?
+
+myStampsCollection é uma plataforma open source para colecionadores de selos:
+- Catálogo internacional por país, tema e ano
+- Gestão de coleção pessoal, incluindo repetidos e variantes
+- Algoritmo de "matches" para trocas automáticas entre utilizadores
+- Estatísticas detalhadas da coleção
+- Importação fácil de dados via CSV
+
+## Por que usar?
+
+- Organize e visualize sua coleção de selos de forma intuitiva
+- Encontre facilmente selos que faltam e repetidos
+- Proponha e aceite trocas com outros colecionadores
+- Sistema extensível e fácil de contribuir
+- Suporte a importação de catálogos nacionais
+
+## Como começar
+
+### Pré-requisitos
+- Python 3.11+
+- PostgreSQL
+- Docker (opcional, recomendado para produção)
+
+### Instalação rápida
+
+```bash
+# Clone o repositório
+$ git clone https://github.com/mbangas/myStampsCollection.git
+$ cd myStampsCollection
+
+# Crie e ative o ambiente virtual
+$ python -m venv .venv
+$ source .venv/bin/activate
+
+# Instale as dependências
+$ pip install -r requirements.txt
+```
+
+### Configuração
+
+1. Copie o arquivo de exemplo de ambiente:
+      ```bash
+      cp .env.example .env
+      ```
+2. Edite `.env` com os dados do seu PostgreSQL
+3. Crie a base de dados:
+      ```sql
+      CREATE DATABASE mystamps_db;
+      ```
+4. Aplique as migrações:
+      ```bash
+      python manage.py migrate
+      ```
+5. Crie um superusuário:
+      ```bash
+      python manage.py createsuperuser
+      ```
+6. (Opcional) Popule com dados de exemplo:
+      ```bash
+      python tools/popular_bd.py
+      ```
+7. Inicie o servidor:
+      ```bash
+      python manage.py runserver
+      ```
+
+Acesse [http://127.0.0.1:8000](http://127.0.0.1:8000) para usar a aplicação.
+
+### Usando com Docker
+
+```bash
+# Suba todos os serviços (web, db, nginx)
+$ docker compose up --build
+```
+
+Acesse [http://localhost](http://localhost) no navegador.
+
+## Estrutura do Projeto
+
+```
+myStampsCollection/
+├── manage.py
+├── requirements.txt
+├── stamps_config/          # Configurações Django
+├── src/
+│   ├── accounts/           # Utilizadores e perfis
+│   ├── catalog/            # Países, selos e temas
+│   ├── collection/         # Coleção do utilizador
+│   ├── exchange/           # Trocas entre utilizadores
+│   ├── static/             # CSS/JS
+│   └── templates/          # HTML
+├── tools/                  # Scripts utilitários
+├── docs/                   # Documentação e dados de catálogo
+├── docker/                 # Configuração Docker/Nginx
+```
+
+Mais detalhes em [docs/README.md](docs/README.md).
+
+## Atualizações
+
+Para atualizar dependências:
+```bash
+pip install -r requirements.txt --upgrade
+```
+Para atualizar o projeto:
+```bash
+git pull origin master
+```
+
+## Onde obter ajuda
+
+- [Documentação](docs/README.md)
+- [Exemplo de dados](docs/Portugal/selos.csv)
+- [Scripts utilitários](tools/)
+- [Wiki do projeto](docs/README.md)
+
+## Quem mantém e contribui
+
+- Mantido por [mbangas](https://github.com/mbangas)
+- Contribuições são bem-vindas! Veja [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) para diretrizes
+- Relate problemas ou sugestões via Issues no GitHub
+
+---
+
+> **Nota:** Este projeto é open source sob licença MIT. Veja o arquivo [LICENSE](LICENSE) para detalhes.
 ## Funcionalidades
 
 | Módulo | Descrição |

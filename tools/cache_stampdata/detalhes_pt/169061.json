@@ -13,5 +13,7 @@
   "tiragem_raw": "",
   "numeros_catalogo": [],
   "ano": 1876,
-  "img_url": ""
+  "img_url": "",
+  "imagem_url": null,
+  "imagem_url_scraped": true
 }

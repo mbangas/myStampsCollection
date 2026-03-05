@@ -9,10 +9,7 @@ services:
     build:
       target: runtime
     entrypoint: []
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             python manage.py runserver 0.0.0.0:8000"
+    command: ["sh", "/app/docker/start_dev.sh"]
     volumes:
       # Monta o código local no contentor → alterações refletem imediatamente
       - .:/app
