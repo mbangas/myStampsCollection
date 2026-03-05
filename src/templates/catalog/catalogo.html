@@ -546,6 +546,41 @@ function abrirModalCriarPais(nome, iso, paisPkExistente) {
     modal.show();
 }
 
+function inserirPaisNaGrelha(nome, url, codigoIso) {
+    const grelha = document.getElementById('grelha-paises');
+    // Remove a mensagem de "vazio" caso exista
+    const emptyItem = grelha.querySelector('.col-12');
+    if (emptyItem) emptyItem.remove();
+
+    const colDiv = document.createElement('div');
+    colDiv.className = 'col pais-item';
+    colDiv.dataset.nome = nome.toLowerCase();
+    colDiv.innerHTML = `
+        <a href="${url}" class="card h-100 text-decoration-none card-pais">
+            <div class="card-body text-center p-3">
+                <span class="fi fi-${codigoIso.toLowerCase()} mb-2" style="font-size:1.8rem;"></span>
+                <div class="fw-semibold small">${nome}</div>
+                <div class="text-muted" style="font-size:.75rem;">0 selos</div>
+            </div>
+        </a>`;
+
+    // Inserir em posição alfabética
+    function normAlpha(s) {
+        return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+    const nomeNorm = normAlpha(nome);
+    const items = [...grelha.querySelectorAll('.pais-item')];
+    let inserted = false;
+    for (const item of items) {
+        if (nomeNorm < normAlpha(item.dataset.nome)) {
+            grelha.insertBefore(colDiv, item);
+            inserted = true;
+            break;
+        }
+    }
+    if (!inserted) grelha.appendChild(colDiv);
+}
+
 document.getElementById('btn-criar-pais').addEventListener('click', async () => {
     const nome     = document.getElementById('novo-pais-nome').value.trim();
     const iso      = document.getElementById('novo-pais-iso').value.trim();
@@ -588,6 +623,9 @@ document.getElementById('btn-criar-pais').addEventListener('click', async () => 
             erroEl.className = 'alert alert-success';
             erroEl.textContent = okMsg;
             erroEl.classList.remove('d-none');
+            if (data.created) {
+                inserirPaisNaGrelha(data.nome, data.url, data.codigo_iso || '');
+            }
         } else {
             window.location.href = data.url;
         }

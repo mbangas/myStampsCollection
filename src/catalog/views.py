@@ -246,6 +246,7 @@ def vista_criar_pais(request: HttpRequest) -> HttpResponse:
         'url': reverse('catalog:pais_detalhe', kwargs={'pk': pais.pk}),
         'nome': pais.nome,
         'pk': pais.pk,
+        'codigo_iso': pais.codigo_iso,
     })
 
 
