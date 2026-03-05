@@ -125,6 +125,8 @@ Introduza uma password segura para a base de dados PostgreSQL.
 #### Ecrã 6 — Barra de Progresso
 O instalador executa todos os passos automaticamente mostrando o progresso em tempo real. **Não é necessário fazer nada** — aguarde até a barra chegar a 100%.
 
+O instalador v2.0 inclui **self-healing automático**: se detectar problemas com o Docker em Proxmox LXC (sysctl, storage driver, nesting), tenta corrigir automaticamente sem intervenção.
+
 > ⏱️ A instalação demora tipicamente **5 a 15 minutos** dependendo da velocidade da ligação à Internet.
 
 ---
@@ -277,6 +279,39 @@ Aguarde 30-60 segundos e recarregue a página. Na primeira inicialização, a ap
 - Aplica as migrações da base de dados
 - Recolhe os ficheiros estáticos
 - Carrega o catálogo inicial de selos (fixtures)
+
+### Erro "ip_unprivileged_port_start: permission denied"
+
+Este erro ocorre em LXC Proxmox quando o kernel bloqueia a escrita de sysctls. O instalador v2.0 tenta corrigir automaticamente via três mecanismos:
+
+1. **sysctl no host LXC** — define `net.ipv4.ip_unprivileged_port_start=0`
+2. **Sem `privileged: true`** — o docker-compose.yml não usa contentores privilegiados
+3. **Fallback `network_mode: host`** — como último recurso, elimina o namespace de rede
+
+Se o self-healing não resolver, no **host Proxmox**:
+
+```bash
+# Editar a configuração do LXC (substituir XXX pelo ID)
+nano /etc/pve/lxc/XXX.conf
+
+# Adicionar esta linha:
+lxc.sysctl.net.ipv4.ip_unprivileged_port_start = 0
+
+# Reiniciar o LXC
+pct stop XXX && pct start XXX
+```
+
+### Erro "MS_PRIVATE: permission denied"
+
+Este erro indica que o LXC não tem **nesting** activo. O instalador tenta mudar automaticamente o storage driver para `vfs`. Se falhar:
+
+No **host Proxmox**:
+```bash
+pct set XXX --features nesting=1,keyctl=1
+pct stop XXX && pct start XXX
+```
+
+Ou na interface Proxmox: Container → Options → Features → activar **Nesting**.
 
 Este processo pode demorar 1-2 minutos na primeira vez.
 

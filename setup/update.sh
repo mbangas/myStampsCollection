@@ -52,6 +52,5 @@ docker compose -f "$APP_DIR/docker-compose.yml" up -d
 echo ""
 echo "  Actualizacao concluida!"
 echo "  Aplicacao disponivel em: http://$(hostname -I | awk '{print $1}')"
-echo "  Portainer disponivel em: http://$(hostname -I | awk '{print $1}'):9000"
 echo "======================================================================"
 echo ""
