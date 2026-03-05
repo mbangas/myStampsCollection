@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block titulo %}Minha Coleção de Selos{% endblock %}</title>
+    <title>{% block titulo %}myStampsCollection{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css">
@@ -16,9 +16,15 @@
     <!-- ── Header GitHub-style ─────────────────────────────────── -->
     <header class="gh-header">
         <div class="container">
-            <a class="gh-logo" href="{% url 'catalog:catalogo' %}">
-                <i class="bi bi-stamp-fill"></i>
-                Selos do Mundo
+            <a class="gh-logo" href="{% url 'landing_page' %}">
+                <svg class="logo-stamp" width="26" height="26" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="8" y="8" width="84" height="84" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="3"/>
+                    <rect x="12" y="12" width="76" height="76" rx="4" fill="none" stroke="#30363d" stroke-width="1" stroke-dasharray="4 3"/>
+                    <circle cx="50" cy="44" r="18" fill="none" stroke="#58a6ff" stroke-width="2.5"/>
+                    <path d="M50 30 C45 30, 36 38, 36 44 C36 52, 50 62, 50 62 C50 62, 64 52, 64 44 C64 38, 55 30, 50 30Z" fill="rgba(88,166,255,0.15)" stroke="#58a6ff" stroke-width="1.5"/>
+                    <text x="50" y="80" text-anchor="middle" fill="#58a6ff" font-size="10" font-weight="600" font-family="sans-serif">STAMPS</text>
+                </svg>
+                myStampsCollection
             </a>
 
             {% if user.is_authenticated %}
@@ -101,8 +107,8 @@
 
     <footer class="gh-footer">
         <div class="container text-center">
-            <i class="bi bi-stamp me-1"></i>
-            Selos do Mundo &copy; {% now "Y" %} — Gestão de Coleções Filatélicas
+            <svg class="logo-stamp me-1" width="16" height="16" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="8" width="84" height="84" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="3"/><circle cx="50" cy="44" r="18" fill="none" stroke="#58a6ff" stroke-width="2.5"/></svg>
+            myStampsCollection &copy; {% now "Y" %} — Gestão de Coleções Filatélicas
         </div>
     </footer>
 

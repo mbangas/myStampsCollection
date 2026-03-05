@@ -1,5 +1,5 @@
 /* ================================================================
-   Selos do Mundo — GitHub-style Dark Theme
+   myStampsCollection — GitHub-style Dark Theme
    ================================================================ */
 
 /* ── Paleta GitHub Dark ─────────────────────────────────────── */
@@ -562,4 +562,34 @@ hr         { border-color: var(--border); opacity: 1; }
     .img-selo { height: 100px; }
     .stat-val  { font-size: 1.4rem; }
     .page-header { padding-top: .75rem; }
+}
+
+/* ── Logo SVG ────────────────────────────────────────────────── */
+.logo-stamp { flex-shrink: 0; }
+.gh-logo .logo-stamp { margin-right: .1rem; }
+
+/* ── Landing page ────────────────────────────────────────────── */
+.landing-hero {
+    padding: 1rem 0 .5rem;
+}
+
+.landing-link-item {
+    background: transparent !important;
+    border-color: var(--border) !important;
+    color: var(--fg) !important;
+    padding: .65rem 1rem !important;
+    transition: background .1s;
+}
+.landing-link-item:hover {
+    background: var(--bg-subtle) !important;
+    text-decoration: none !important;
+    color: var(--fg) !important;
+}
+
+.landing-news-item a {
+    color: var(--accent);
+    transition: color .1s;
+}
+.landing-news-item a:hover {
+    color: #79c0ff;
 }

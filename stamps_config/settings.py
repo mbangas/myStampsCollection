@@ -147,7 +147,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # ─── Autenticação ─────────────────────────────────────────────────────────────
 
 LOGIN_URL = '/contas/entrar/'
-LOGIN_REDIRECT_URL = '/catalogo/'
+LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 # ─── Crispy Forms ─────────────────────────────────────────────────────────────

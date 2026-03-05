@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block titulo %}myStampsCollection – Início{% endblock %}
+
+{% block conteudo %}
+
+<!-- ── Hero / Resumo ─────────────────────────────────────────── -->
+<div class="landing-hero mb-4">
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <svg class="logo-stamp" width="48" height="48" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="8" width="84" height="84" rx="6" fill="#161b22" stroke="#58a6ff" stroke-width="3"/>
+            <rect x="12" y="12" width="76" height="76" rx="4" fill="none" stroke="#30363d" stroke-width="1" stroke-dasharray="4 3"/>
+            <circle cx="50" cy="44" r="18" fill="none" stroke="#58a6ff" stroke-width="2.5"/>
+            <path d="M50 30 C45 30, 36 38, 36 44 C36 52, 50 62, 50 62 C50 62, 64 52, 64 44 C64 38, 55 30, 50 30Z" fill="rgba(88,166,255,0.15)" stroke="#58a6ff" stroke-width="1.5"/>
+            <text x="50" y="80" text-anchor="middle" fill="#58a6ff" font-size="10" font-weight="600" font-family="sans-serif">STAMPS</text>
+        </svg>
+        <div>
+            <h1 class="mb-0" style="font-size:1.4rem;font-weight:700;">myStampsCollection</h1>
+            <p class="text-muted mb-0" style="font-size:.85rem;">Gestão de Coleções Filatélicas</p>
+        </div>
+    </div>
+</div>
+
+<!-- ── Estatísticas rápidas ──────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card-indicador p-3 text-center">
+            <div class="stat-val text-primary">{{ total_paises }}</div>
+            <div class="text-muted" style="font-size:.78rem;">Países</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-indicador p-3 text-center">
+            <div class="stat-val" style="color:#58a6ff;">{{ total_selos|intcomma }}</div>
+            <div class="text-muted" style="font-size:.78rem;">Selos no Catálogo</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-indicador p-3 text-center">
+            <div class="stat-val" style="color:#3fb950;">{{ total_colecao|intcomma }}</div>
+            <div class="text-muted" style="font-size:.78rem;">Na Minha Coleção</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card-indicador p-3 text-center">
+            <div class="stat-val" style="color:#d29922;">{{ total_repetidos|intcomma }}</div>
+            <div class="text-muted" style="font-size:.78rem;">Repetidos p/ Troca</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Ações rápidas ─────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <a href="{% url 'catalog:catalogo' %}" class="card-pais p-3 d-flex align-items-center gap-3">
+            <i class="bi bi-grid-3x3-gap" style="font-size:1.5rem;color:#58a6ff;"></i>
+            <div>
+                <div style="font-weight:600;font-size:.9rem;">Catálogo</div>
+                <div class="text-muted" style="font-size:.78rem;">Explorar selos por país</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{% url 'collection:colecao' %}" class="card-pais p-3 d-flex align-items-center gap-3">
+            <i class="bi bi-collection" style="font-size:1.5rem;color:#3fb950;"></i>
+            <div>
+                <div style="font-weight:600;font-size:.9rem;">Minha Coleção</div>
+                <div class="text-muted" style="font-size:.78rem;">Ver e gerir a coleção</div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="{% url 'exchange:trocas' %}" class="card-pais p-3 d-flex align-items-center gap-3">
+            <i class="bi bi-arrow-left-right" style="font-size:1.5rem;color:#d29922;"></i>
+            <div>
+                <div style="font-weight:600;font-size:.9rem;">Trocas</div>
+                <div class="text-muted" style="font-size:.78rem;">Trocar selos repetidos</div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+
+    <!-- ── Países com selos ──────────────────────────────────── -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-flag" style="color:#58a6ff;"></i>
+                <span style="font-weight:600;font-size:.9rem;">Países no Catálogo</span>
+                <span class="badge bg-secondary ms-auto">{{ paises_com_selos|length }}</span>
+            </div>
+            <div class="card-body p-0" style="max-height:320px;overflow-y:auto;">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>País</th>
+                            <th class="text-end" style="width:100px;">Selos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pais in paises_com_selos %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'catalog:pais_detalhe' pais.pk %}" class="d-flex align-items-center gap-2">
+                                    {% if pais.codigo_iso|length == 2 %}
+                                    <span class="fi fi-{{ pais.codigo_iso|lower }}" style="font-size:1.1rem;"></span>
+                                    {% endif %}
+                                    {{ pais.nome }}
+                                </a>
+                            </td>
+                            <td class="text-end">
+                                <span class="badge bg-secondary">{{ pais.num_selos|intcomma }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Notícias de Filatelia ─────────────────────────────── -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-newspaper" style="color:#d29922;"></i>
+                <span style="font-weight:600;font-size:.9rem;">Notícias de Filatelia</span>
+            </div>
+            <div class="card-body">
+                {% if noticias %}
+                <ul class="list-unstyled mb-0">
+                    {% for noticia in noticias %}
+                    <li class="landing-news-item {% if not forloop.last %}mb-2 pb-2{% endif %}" {% if not forloop.last %}style="border-bottom:1px solid var(--border);"{% endif %}>
+                        <a href="{{ noticia.url }}" target="_blank" rel="noopener" class="d-block" style="font-size:.875rem;">
+                            {{ noticia.titulo }}
+                        </a>
+                        <small class="text-muted">{{ noticia.fonte }}</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center text-muted py-3">
+                    <i class="bi bi-cloud-slash" style="font-size:1.5rem;"></i>
+                    <p class="mb-0 mt-1" style="font-size:.85rem;">
+                        Não foi possível obter notícias de momento.<br>
+                        Tente novamente mais tarde.
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ── Links Úteis ───────────────────────────────────── -->
+        <div class="card mt-3">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-link-45deg" style="color:#3fb950;"></i>
+                <span style="font-weight:600;font-size:.9rem;">Links Úteis</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for link in links_uteis %}
+                    <a href="{{ link.url }}" target="_blank" rel="noopener"
+                       class="list-group-item list-group-item-action d-flex align-items-start gap-3 landing-link-item">
+                        <i class="bi {{ link.icone }}" style="font-size:1.15rem;color:var(--accent);margin-top:2px;flex-shrink:0;"></i>
+                        <div>
+                            <div style="font-weight:600;font-size:.875rem;">{{ link.titulo }}</div>
+                            <div class="text-muted" style="font-size:.78rem;">{{ link.descricao }}</div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

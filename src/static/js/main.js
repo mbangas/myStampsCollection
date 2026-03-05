@@ -1,5 +1,5 @@
 /**
- * Selos do Mundo – JavaScript principal
+ * myStampsCollection – JavaScript principal
  */
 
 document.addEventListener('DOMContentLoaded', () => {

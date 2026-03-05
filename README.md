@@ -1,4 +1,4 @@
-# Selos do Mundo 🌍📮
+# myStampsCollection 🌍📮
 
 Sistema web para gerir coleções de selos filatélicos de todo o mundo, com catálogo por país, gestão de coleção pessoal e zona de trocas entre utilizadores.
 

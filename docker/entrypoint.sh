@@ -1,6 +1,6 @@
 #!/bin/sh
 # =============================================================================
-# Entrypoint do contentor Django – Selos do Mundo
+# Entrypoint do contentor Django – myStampsCollection
 # =============================================================================
 set -e
 
