@@ -1,7 +1,7 @@
 """Script para importar os selos espanhóis do catálogo StampData.
 
-Fonte: https://www.stampdata.com/ (emissor Espanha, ID=36)
-  → Para verificar/confirmar: https://www.stampdata.com/stamps.php?fissuer=36
+Fonte: https://www.stampdata.com/ (emissor Espanha, ID=25)
+  → Para verificar/confirmar: https://www.stampdata.com/stamps.php?fissuer=25
 
 Execução (dentro do container Docker):
     docker-compose exec web python tools/importar_selos_espanha.py
@@ -39,7 +39,7 @@ from catalog.models import Pais, Selo, Serie, Tema  # noqa: E402
 
 # ─── Constantes ───────────────────────────────────────────────────────────────
 BASE_URL = "https://www.stampdata.com"
-ISSUER_ID = 36  # Espanha — confirmar em https://www.stampdata.com/stamps.php?fissuer=36
+ISSUER_ID = 25  # Espanha — https://www.stampdata.com/stamps.php?fissuer=25
 CODIGO_PAIS = "ES"
 PAGE_SIZE = 50
 REQUEST_DELAY = 1.5  # segundos entre pedidos (respeito pelas regras do site)

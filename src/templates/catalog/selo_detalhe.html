@@ -59,11 +59,15 @@
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{% url 'catalog:catalogo' %}">Catálogo</a></li>
         <li class="breadcrumb-item">
-            <a href="{% url 'catalog:pais_detalhe' selo.pais.pk %}">{{ selo.pais.nome }}</a>
+            <a href="{{ back_url }}">{{ selo.pais.nome }}</a>
         </li>
         <li class="breadcrumb-item active">{{ selo.titulo }}</li>
     </ol>
 </nav>
+
+<a href="{{ back_url }}" class="btn btn-outline-secondary btn-sm mb-3">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+</a>
 
 <div class="row g-4">
     <!-- Imagem + upload -->
@@ -93,30 +97,44 @@
 
         <!-- Botão coleção -->
         <div class="mt-2">
-            {% if item_colecao %}
-                <div class="alert alert-success py-2 mb-2">
-                    <i class="bi bi-check-circle me-1"></i>
-                    Tens {{ item_colecao.quantidade_possuida }} na coleção
-                    {% if item_colecao.quantidade_repetidos > 0 %}
-                        ({{ item_colecao.quantidade_repetidos }} repetido{{ item_colecao.quantidade_repetidos|pluralize }})
-                    {% endif %}
-                </div>
-                <a href="{% url 'collection:editar_item' item_colecao.pk %}"
+            <div id="edit-colecao-area" {% if not item_colecao %}style="display:none;"{% endif %}>
+                <a href="{% if item_colecao %}{% url 'collection:editar_item' item_colecao.pk %}{% else %}#{% endif %}"
+                   id="link-editar-colecao"
                    class="btn btn-outline-primary w-100">
                     <i class="bi bi-pencil me-1"></i> Editar na Coleção
                 </a>
-            {% else %}
-                <a href="{% url 'collection:adicionar_selo' selo.pk %}"
-                   class="btn btn-primary w-100">
-                    <i class="bi bi-plus-lg me-1"></i> Adicionar à Coleção
-                </a>
-            {% endif %}
+            </div>
         </div>
     </div>
 
     <!-- Detalhes -->
     <div class="col-md-8">
-        <h1 class="h3">{{ selo.titulo }}</h1>
+        <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+            <h1 class="h3 mb-0">{{ selo.titulo }}</h1>
+            <button
+                id="btn-toggle-colecao"
+                type="button"
+                class="btn btn-link p-0 border-0 flex-shrink-0"
+                data-selo-id="{{ selo.pk }}"
+                data-na-colecao="{% if item_colecao %}1{% else %}0{% endif %}"
+                data-toggle-url="{% url 'collection:toggle_colecao_rapido' selo.pk %}"
+                data-edit-url-base="/colecao/editar/"
+                data-csrf="{{ csrf_token }}"
+                title="{% if item_colecao %}Na tua coleção (clica para remover){% else %}Adicionar à coleção{% endif %}"
+                style="line-height:1;">
+                {% if item_colecao %}
+                <svg id="icon-colecao" width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="13" cy="13" r="12" fill="#238636" stroke="#2ea043" stroke-width="1.5"/>
+                    <polyline points="7,13.5 11,17.5 19,9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {% else %}
+                <svg id="icon-colecao" width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="13" cy="13" r="12" stroke="#30363d" stroke-width="1.5"/>
+                    <polyline points="7,13.5 11,17.5 19,9" stroke="#444c56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {% endif %}
+            </button>
+        </div>
         <p class="text-muted">
             <a href="{% url 'catalog:pais_detalhe' selo.pais.pk %}">{{ selo.pais.nome }}</a>
             · {{ selo.ano }}
@@ -236,7 +254,7 @@
 </h2>
 <div class="serie-thumbs-scroll">
     {% for s in selos_serie %}
-    <a href="{% url 'catalog:selo_detalhe' s.pk %}" class="serie-thumb-card" title="{{ s.titulo }} – {{ s.denominacao }} {{ s.moeda }}">
+    <a href="{% url 'catalog:selo_detalhe' s.pk %}?voltar={{ back_url|urlencode }}" class="serie-thumb-card" title="{{ s.titulo }} – {{ s.denominacao }} {{ s.moeda }}">
         {% if s.imagem %}
             <img src="{{ s.imagem.url }}" alt="{{ s.titulo }}" class="serie-thumb-img">
         {% else %}
@@ -250,5 +268,62 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block js_extra %}
+<script>
+(function () {
+    const btn = document.getElementById('btn-toggle-colecao');
+    if (!btn) return;
+
+    btn.addEventListener('click', async function () {
+        const url    = btn.dataset.toggleUrl;
+        const csrf   = btn.dataset.csrf;
+        const naColecao = btn.dataset.naColecao === '1';
+
+        btn.disabled = true;
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!resp.ok) throw new Error('Erro ao comunicar com o servidor.');
+            const data = await resp.json();
+
+            const agora = data.na_colecao;
+            btn.dataset.naColecao = agora ? '1' : '0';
+            btn.title = agora
+                ? 'Na tua coleção (clica para remover)'
+                : 'Adicionar à coleção';
+
+            const icon = document.getElementById('icon-colecao');
+            if (agora) {
+                icon.innerHTML = `
+                    <circle cx="13" cy="13" r="12" fill="#238636" stroke="#2ea043" stroke-width="1.5"/>
+                    <polyline points="7,13.5 11,17.5 19,9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+            } else {
+                icon.innerHTML = `
+                    <circle cx="13" cy="13" r="12" stroke="#30363d" stroke-width="1.5"/>
+                    <polyline points="7,13.5 11,17.5 19,9" stroke="#444c56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+            }
+
+            /* Actualiza o botão "Editar na Coleção" sem recarregar a página */
+            const editArea = document.getElementById('edit-colecao-area');
+            const editLink = document.getElementById('link-editar-colecao');
+            if (editArea) {
+                editArea.style.display = agora ? '' : 'none';
+            }
+            if (editLink && agora && data.item_pk) {
+                const base = btn.dataset.editUrlBase;
+                editLink.href = `${base}${data.item_pk}/`;
+            }
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+})();
+</script>
 {% endblock %}
 

@@ -83,6 +83,58 @@
 
 <div class="row g-4">
 
+    <!-- ── Importação em curso (só visível quando activa) ───── -->
+    <div class="col-12" id="box-importacao-wrap" {% if not importacao_activa %}style="display:none;"{% endif %}>
+        <div class="card" style="border-color:#58a6ff33;">
+            <div class="card-header d-flex align-items-center gap-2" style="border-color:#58a6ff33;">
+                <i class="bi bi-cloud-download" style="color:#58a6ff;"></i>
+                <span style="font-weight:600;font-size:.9rem;">Importação de Catálogo em Curso</span>
+                <span id="box-imp-pais" class="badge ms-1"
+                      style="background:#21262d;color:#58a6ff;border:1px solid #30363d;">
+                    {% if importacao_activa %}{{ importacao_activa.pais.nome }}{% endif %}
+                </span>
+                <span id="box-imp-estado" class="badge ms-auto
+                    {% if importacao_activa %}
+                        {% if importacao_activa.estado == 'a_correr' %}bg-primary
+                        {% elif importacao_activa.estado == 'concluido' %}bg-success
+                        {% else %}bg-danger{% endif %}
+                    {% else %}bg-secondary{% endif %}">
+                    {% if importacao_activa %}{{ importacao_activa.get_estado_display }}{% endif %}
+                </span>
+            </div>
+            <div class="card-body pb-2">
+                <div class="d-flex justify-content-between mb-1">
+                    <small id="box-imp-fase" style="color:#8b949e;font-size:.8rem;">
+                        {% if importacao_activa %}{{ importacao_activa.fase_atual }}{% endif %}
+                    </small>
+                    <small id="box-imp-pct" style="color:#58a6ff;font-size:.8rem;">
+                        {% if importacao_activa %}{{ importacao_activa.progresso_pct }}%{% else %}0%{% endif %}
+                    </small>
+                </div>
+                <div class="progress mb-2" style="height:8px;background:#21262d;">
+                    <div id="box-imp-barra"
+                         class="progress-bar {% if importacao_activa and importacao_activa.estado == 'a_correr' %}bg-primary progress-bar-striped progress-bar-animated{% elif importacao_activa and importacao_activa.estado == 'concluido' %}bg-success{% else %}bg-danger{% endif %}"
+                         role="progressbar"
+                         style="width:{% if importacao_activa %}{{ importacao_activa.progresso_pct }}%{% else %}0%{% endif %}">
+                    </div>
+                </div>
+                <div class="row g-2" style="font-size:.75rem;color:#8b949e;">
+                    <div class="col-6">
+                        <span id="box-imp-criados">{% if importacao_activa %}{{ importacao_activa.selos_criados }}{% else %}0{% endif %}</span> selos criados,
+                        <span id="box-imp-atualizados">{% if importacao_activa %}{{ importacao_activa.selos_atualizados }}{% else %}0{% endif %}</span> atualizados
+                    </div>
+                    <div class="col-6 text-end">
+                        Imagens:
+                        <span id="box-imp-imgs">{% if importacao_activa %}{{ importacao_activa.imagens_processadas }}/{{ importacao_activa.imagens_total }}{% else %}0/0{% endif %}</span>
+                    </div>
+                </div>
+                <div id="box-imp-erro" class="alert alert-danger mt-2 {% if not importacao_activa or importacao_activa.estado != 'erro' %}d-none{% endif %}" style="font-size:.8rem;padding:.4rem .7rem;">
+                    {% if importacao_activa and importacao_activa.estado == 'erro' %}{{ importacao_activa.mensagem_erro }}{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ── Países com selos ──────────────────────────────────── -->
     <div class="col-lg-6">
         <div class="card">
@@ -177,4 +229,88 @@
 
 </div>
 
+{% endblock %}
+
+{% block js_extra %}
+<script>
+/* ═══ Polling de importação em curso (landing page) ══════════════ */
+(function() {
+    const wrap   = document.getElementById('box-importacao-wrap');
+    const barra  = document.getElementById('box-imp-barra');
+    const fase   = document.getElementById('box-imp-fase');
+    const pct    = document.getElementById('box-imp-pct');
+    const estado = document.getElementById('box-imp-estado');
+    const pais   = document.getElementById('box-imp-pais');
+    const criados= document.getElementById('box-imp-criados');
+    const atual  = document.getElementById('box-imp-atualizados');
+    const imgs   = document.getElementById('box-imp-imgs');
+    const erroEl = document.getElementById('box-imp-erro');
+
+    if (!wrap) return;
+
+    let intervalo = null;
+
+    function estadoBadgeClass(e) {
+        if (e === 'a_correr') return 'badge bg-primary ms-auto';
+        if (e === 'concluido') return 'badge bg-success ms-auto';
+        return 'badge bg-danger ms-auto';
+    }
+
+    function actualizarUI(d) {
+        wrap.style.display = '';
+        pais.textContent   = d.pais || '';
+        fase.textContent   = d.fase_atual || '…';
+        pct.textContent    = d.progresso_pct + '%';
+        barra.style.width  = d.progresso_pct + '%';
+        criados.textContent= d.selos_criados;
+        atual.textContent  = d.selos_atualizados;
+        imgs.textContent   = d.imagens_processadas + '/' + (d.imagens_total || '?');
+        estado.className   = estadoBadgeClass(d.estado);
+        estado.textContent = d.estado === 'a_correr' ? 'A correr'
+            : d.estado === 'concluido' ? 'Concluído' : 'Erro';
+
+        if (d.estado === 'a_correr') {
+            barra.className = 'progress-bar bg-primary progress-bar-striped progress-bar-animated';
+            erroEl.classList.add('d-none');
+        } else if (d.estado === 'concluido') {
+            barra.className = 'progress-bar bg-success';
+            erroEl.classList.add('d-none');
+            if (intervalo) { clearInterval(intervalo); intervalo = null; }
+        } else {
+            barra.className = 'progress-bar bg-danger';
+            erroEl.textContent = d.mensagem_erro || 'Erro desconhecido.';
+            erroEl.classList.remove('d-none');
+            if (intervalo) { clearInterval(intervalo); intervalo = null; }
+        }
+    }
+
+    async function verificar() {
+        try {
+            const r = await fetch('{% url "catalog:estado_importacao" %}',
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!r.ok) return;
+            const d = await r.json();
+            if (d.nenhuma || d.error) {
+                // Nenhuma importação recente — oculta a caixa
+                wrap.style.display = 'none';
+                if (intervalo) { clearInterval(intervalo); intervalo = null; }
+                return;
+            }
+            actualizarUI(d);
+            if (d.a_correr && !intervalo) {
+                intervalo = setInterval(verificar, 3000);
+            }
+        } catch (_) {}
+    }
+
+    // Inicia polling se a caixa já estava visível (importação activa)
+    if (wrap.style.display !== 'none') {
+        {% if importacao_activa and importacao_activa.estado == 'a_correr' %}
+        intervalo = setInterval(verificar, 3000);
+        {% endif %}
+    }
+    // Verifica sempre ao carregar a página para detectar importações iniciadas de outro lugar
+    verificar();
+})();
+</script>
 {% endblock %}

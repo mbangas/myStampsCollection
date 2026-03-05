@@ -1,6 +1,7 @@
 """Vistas da aplicação Catálogo."""
 
 import json
+import threading
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -10,9 +11,10 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import DetailView, ListView
 
-from .models import Pais, Selo, Serie, Tema, Variante
+from .models import ImportacaoCatalogo, Pais, Selo, Serie, Tema, Variante
 
 
 @method_decorator(login_required, name='dispatch')
@@ -166,6 +168,17 @@ class VistaSeloDetalhe(DetailView):
         context['variantes'] = variantes
         context['variantes_possuidas_ids'] = variantes_possuidas_ids
         context['selos_serie'] = selos_serie
+
+        # URL de retorno ao catálogo do país (enviada como parâmetro ?voltar=)
+        voltar = self.request.GET.get('voltar', '').strip()
+        if voltar and url_has_allowed_host_and_scheme(
+            url=voltar,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            context['back_url'] = voltar
+        else:
+            context['back_url'] = reverse('catalog:pais_detalhe', kwargs={'pk': self.object.pais.pk})
         return context
 
 
@@ -222,4 +235,123 @@ def vista_criar_pais(request: HttpRequest) -> HttpResponse:
         'url': reverse('catalog:pais_detalhe', kwargs={'pk': pais.pk}),
         'nome': pais.nome,
         'pk': pais.pk,
+    })
+
+
+@login_required
+def vista_editar_descricao_pais(request: HttpRequest, pk: int) -> HttpResponse:
+    """Atualiza a descrição de um país via AJAX."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    pais = get_object_or_404(Pais, pk=pk)
+    descricao = request.POST.get('descricao', '').strip()
+    pais.descricao = descricao
+    pais.save(update_fields=['descricao'])
+    return JsonResponse({'ok': True, 'descricao': pais.descricao})
+
+
+@login_required
+def vista_iniciar_importacao_stampdata(request: HttpRequest) -> JsonResponse:
+    """Inicia uma importação do StampData em background para o país especificado."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    pais_pk = request.POST.get('pais_pk', '').strip()
+    issuer_id_raw = request.POST.get('issuer_id', '').strip()
+
+    if not pais_pk or not issuer_id_raw:
+        return JsonResponse({'error': 'pais_pk e issuer_id são obrigatórios.'}, status=400)
+
+    try:
+        issuer_id = int(issuer_id_raw)
+        if issuer_id <= 0:
+            raise ValueError
+    except ValueError:
+        return JsonResponse({'error': 'issuer_id deve ser um número inteiro positivo.'}, status=400)
+
+    pais = get_object_or_404(Pais, pk=pais_pk)
+
+    # Verificar se já existe uma importação em curso
+    importacao_activa = ImportacaoCatalogo.objects.filter(
+        estado=ImportacaoCatalogo.ESTADO_A_CORRER
+    ).select_related('pais').first()
+
+    if importacao_activa:
+        return JsonResponse({
+            'error': (
+                f'Já está a decorrer uma importação para "{importacao_activa.pais.nome}". '
+                'Aguarde que conclua antes de iniciar outra.'
+            ),
+            'importacao_id': importacao_activa.pk,
+        }, status=409)
+
+    # Criar registo de importação
+    importacao = ImportacaoCatalogo.objects.create(
+        pais=pais,
+        issuer_id=issuer_id,
+        estado=ImportacaoCatalogo.ESTADO_A_CORRER,
+        fase_atual='A iniciar…',
+        iniciado_por=request.user,
+    )
+
+    # Lançar thread em background
+    from .importador_stampdata import executar_importacao  # importação local para evitar ciclos
+
+    t = threading.Thread(
+        target=executar_importacao,
+        args=(importacao.pk,),
+        daemon=True,
+        name=f'importacao-{importacao.pk}',
+    )
+    t.start()
+
+    return JsonResponse({
+        'importacao_id': importacao.pk,
+        'pais': pais.nome,
+        'estado': importacao.estado,
+    })
+
+
+@login_required
+def vista_estado_importacao(request: HttpRequest) -> JsonResponse:
+    """Devolve o estado actual da importação em curso (ou da mais recente)."""
+    importacao_id = request.GET.get('id')
+
+    if importacao_id:
+        try:
+            importacao = ImportacaoCatalogo.objects.select_related('pais').get(
+                pk=int(importacao_id)
+            )
+        except (ImportacaoCatalogo.DoesNotExist, ValueError):
+            return JsonResponse({'error': 'Importação não encontrada.'}, status=404)
+    else:
+        # Devolve a importação activa ou a mais recente
+        importacao = (
+            ImportacaoCatalogo.objects.filter(estado=ImportacaoCatalogo.ESTADO_A_CORRER)
+            .select_related('pais')
+            .first()
+            or ImportacaoCatalogo.objects.select_related('pais').first()
+        )
+
+    if not importacao:
+        return JsonResponse({'nenhuma': True})
+
+    return JsonResponse({
+        'id': importacao.pk,
+        'pais': importacao.pais.nome,
+        'estado': importacao.estado,
+        'fase_atual': importacao.fase_atual,
+        'progresso_pct': importacao.progresso_pct,
+        'total_ids': importacao.total_ids,
+        'ids_processados': importacao.ids_processados,
+        'selos_criados': importacao.selos_criados,
+        'selos_atualizados': importacao.selos_atualizados,
+        'erros': importacao.erros_importacao,
+        'imagens_total': importacao.imagens_total,
+        'imagens_processadas': importacao.imagens_processadas,
+        'mensagem_erro': importacao.mensagem_erro,
+        'iniciado_em': importacao.iniciado_em.isoformat() if importacao.iniciado_em else None,
+        'concluido_em': importacao.concluido_em.isoformat() if importacao.concluido_em else None,
+        'a_correr': importacao.estado == ImportacaoCatalogo.ESTADO_A_CORRER,
     })

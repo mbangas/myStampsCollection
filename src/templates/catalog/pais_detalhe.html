@@ -4,21 +4,22 @@
 
 {% block css_extra %}
 <style>
-/* ── Layout com timeline lateral ────────────────────────────── */
+/* ── Layout com duas timelines ──────────────────────────────── */
 .pais-layout {
     display: grid;
-    grid-template-columns: 68px 1fr;
-    gap: 0 1.25rem;
+    grid-template-columns: 52px 1fr 64px;
+    gap: 0 1rem;
     align-items: start;
 }
 @media (max-width: 768px) {
     .pais-layout {
         grid-template-columns: 1fr;
     }
+    .decada-timeline,
     .ano-timeline { display: none; }
 }
 
-/* ── Timeline lateral (Google Photos style) ─────────────────── */
+/* ── Timeline de anos (direita) ─────────────────────────────── */
 .ano-timeline {
     position: sticky;
     top: 80px;
@@ -58,6 +59,10 @@
     font-weight: 700;
     background: rgba(88,166,255,.18);
 }
+.ano-btn.highlight {
+    color: rgba(88,166,255,.85);
+    background: rgba(88,166,255,.07);
+}
 .ano-timeline-line {
     width: 1px;
     flex: 1;
@@ -66,55 +71,53 @@
     margin: 0 auto;
 }
 
-/* ── Decade jump buttons ────────────────────────────────────── */
+/* ── Timeline de décadas (esquerda) ─────────────────────────── */
+.decada-timeline {
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+    gap: 0;
+}
+.decada-timeline::-webkit-scrollbar { display: none; }
 .decada-btn {
-    font-size: .6rem;
-    font-weight: 700;
-    color: #58a6ff;
-    padding: 3px 2px;
+    font-size: .63rem;
+    font-weight: 600;
+    color: #8b949e;
+    padding: 5px 2px;
     width: 100%;
     text-align: center;
     cursor: pointer;
     border: none;
-    border-top: 1px solid rgba(88,166,255,.3);
-    background: rgba(88,166,255,.1);
-    border-radius: 3px;
+    background: none;
+    border-radius: 4px;
     transition: color .12s, background .12s;
-    letter-spacing: .04em;
     line-height: 1.3;
     white-space: nowrap;
+    letter-spacing: .02em;
 }
-.decada-btn:hover {
-    background: rgba(88,166,255,.25);
-    color: #a5d0ff;
+.decada-btn:hover { color: #58a6ff; background: rgba(88,166,255,.08); }
+.decada-btn.active {
+    color: #58a6ff;
+    font-weight: 700;
+    background: rgba(88,166,255,.15);
 }
-
-/* ── Card com checkmark em vez de borda ─────────────────────── */
-.card-selo-colecao {
-    position: relative;
+.decada-btn.highlight {
+    color: rgba(88,166,255,.7);
+    background: rgba(88,166,255,.05);
 }
-.card-selo-colecao .checkmark-colecao {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #238636;
-    border: 2px solid #2ea043;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2;
-}
-.card-selo-colecao .checkmark-colecao svg {
-    width: 11px;
-    height: 11px;
-    stroke: #fff;
-    fill: none;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.decada-timeline-line {
+    width: 1px;
+    flex: 1;
+    min-height: 8px;
+    background: #21262d;
+    margin: 0 auto;
 }
 
 /* ── Botão voltar ao topo ────────────────────────────────────── */
@@ -165,9 +168,34 @@
     </div>
 </div>
 
-{% if pais.descricao %}
-<p class="text-muted">{{ pais.descricao }}</p>
-{% endif %}
+<!-- Descrição do país (com edição inline) -->
+<div class="mb-3" id="descricao-wrapper">
+    <div id="descricao-display" class="d-flex align-items-start gap-2">
+        <p class="text-muted mb-0" id="descricao-texto" style="flex:1;">
+            {% if pais.descricao %}{{ pais.descricao }}{% else %}<span class="fst-italic" style="color:#484f58;">Sem descrição.</span>{% endif %}
+        </p>
+        <button type="button" id="btn-editar-descricao"
+                class="btn btn-link p-0 border-0 text-secondary"
+                title="Editar descrição" style="line-height:1;flex-shrink:0;">
+            <i class="bi bi-pencil" style="font-size:.85rem;"></i>
+        </button>
+    </div>
+    <form id="form-editar-descricao" class="d-none mt-2"
+          data-url="{% url 'catalog:editar_descricao_pais' pais.pk %}">
+        {% csrf_token %}
+        <textarea id="input-descricao" class="form-control form-control-sm mb-2"
+                  rows="3" placeholder="Descrição do país…">{{ pais.descricao }}</textarea>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-check-lg me-1"></i>Guardar
+            </button>
+            <button type="button" id="btn-cancelar-descricao" class="btn btn-outline-secondary btn-sm">
+                Cancelar
+            </button>
+        </div>
+        <div id="descricao-erro" class="alert alert-danger mt-2 d-none py-1 px-2 small"></div>
+    </form>
+</div>
 
 <!-- Filtros -->
 <form method="get" class="row g-2 mb-2" id="form-filtros">
@@ -209,29 +237,13 @@
     {% endif %}
 </p>
 
-<!-- Layout: timeline + selos -->
+<!-- Layout: décadas | selos | anos -->
 <div class="pais-layout">
 
-    <!-- ── Timeline lateral de anos ── -->
-    {% if anos %}
-    <nav class="ano-timeline" id="ano-timeline" aria-label="Navegação por ano">
-        {% for a in anos %}
-        {% if not forloop.first %}
-            <div class="ano-timeline-line"></div>
-        {% endif %}
-        <button
-            class="ano-btn {% if a|stringformat:'s' == ano_selecionado %}active{% endif %}"
-            data-ano="{{ a }}"
-            data-href="?ano={{ a }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
-            onclick="window.location.href=this.dataset.href"
-            title="{{ a }}">
-            {{ a }}
-        </button>
-        {% endfor %}
-    </nav>
-    {% endif %}
+    <!-- ── Timeline de décadas (esquerda) ── -->
+    <nav class="decada-timeline" id="decada-timeline" aria-label="Navegação por década"></nav>
 
-    <!-- ── Grelha de selos ── -->
+    <!-- ── Grelha de selos (centro) ── -->
     <div>
         {% regroup selos by ano as grupos_ano %}
         {% for grupo in grupos_ano %}
@@ -278,18 +290,11 @@
             </div>
             {% endif %}
 
-            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3">
+            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 g-3 justify-content-center">
                 {% for selo in grupo_serie.list %}
-                <div class="col">
+                <div class="col" id="card-{{ selo.pk }}">
                     <div class="card h-100 card-selo card-selo-colecao">
-                        {% if selo.pk in ids_colecao %}
-                        <div class="checkmark-colecao" title="Na tua coleção">
-                            <svg viewBox="0 0 12 12">
-                                <polyline points="1.5,6 5,9.5 10.5,3"/>
-                            </svg>
-                        </div>
-                        {% endif %}
-                        <a href="{% url 'catalog:selo_detalhe' selo.pk %}">
+                        <a href="{% url 'catalog:selo_detalhe' selo.pk %}?voltar={{ request.get_full_path|urlencode }}%23card-{{ selo.pk }}">
                             {% if selo.imagem %}
                                 <img src="{{ selo.imagem.url }}" alt="{{ selo.titulo }}"
                                      class="card-img-top img-selo">
@@ -301,7 +306,29 @@
                             {% endif %}
                         </a>
                         <div class="card-body p-2">
-                            <p class="card-text small mb-1 fw-semibold">{{ selo.titulo }}</p>
+                            <div class="d-flex align-items-start justify-content-between gap-1 mb-1">
+                                <p class="card-text small fw-semibold mb-0">{{ selo.titulo }}</p>
+                                <button
+                                    type="button"
+                                    class="btn btn-link p-0 border-0 flex-shrink-0 btn-toggle-card"
+                                    data-selo-id="{{ selo.pk }}"
+                                    data-na-colecao="{% if selo.pk in ids_colecao %}1{% else %}0{% endif %}"
+                                    data-toggle-url="{% url 'collection:toggle_colecao_rapido' selo.pk %}"
+                                    title="{% if selo.pk in ids_colecao %}Na tua coleção (clica para remover){% else %}Adicionar à coleção{% endif %}"
+                                    style="line-height:1;">
+                                    {% if selo.pk in ids_colecao %}
+                                    <svg class="ico-toggle" width="18" height="18" viewBox="0 0 26 26" fill="none">
+                                        <circle cx="13" cy="13" r="12" fill="#238636" stroke="#2ea043" stroke-width="1.5"/>
+                                        <polyline points="7,13.5 11,17.5 19,9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    {% else %}
+                                    <svg class="ico-toggle" width="18" height="18" viewBox="0 0 26 26" fill="none">
+                                        <circle cx="13" cy="13" r="12" stroke="#30363d" stroke-width="1.5"/>
+                                        <polyline points="7,13.5 11,17.5 19,9" stroke="#444c56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    {% endif %}
+                                </button>
+                            </div>
                             <p class="card-text text-muted" style="font-size:.75rem;">
                                 {{ selo.denominacao }} {{ selo.moeda }}
                             </p>
@@ -310,17 +337,10 @@
                             </p>
                         </div>
                         <div class="card-footer p-2 d-flex gap-1">
-                            {% if selo.pk in ids_colecao %}
-                                <a href="{% url 'catalog:selo_detalhe' selo.pk %}"
-                                   class="btn btn-outline-secondary btn-sm w-100">
-                                    <i class="bi bi-eye me-1"></i>Ver
-                                </a>
-                            {% else %}
-                                <a href="{% url 'collection:adicionar_selo' selo.pk %}"
-                                   class="btn btn-outline-primary btn-sm w-100">
-                                    <i class="bi bi-plus"></i> Adicionar
-                                </a>
-                            {% endif %}
+                            <a href="{% url 'catalog:selo_detalhe' selo.pk %}?voltar={{ request.get_full_path|urlencode }}%23card-{{ selo.pk }}"
+                               class="btn btn-outline-secondary btn-sm w-100">
+                                <i class="bi bi-eye me-1"></i>Ver
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -366,6 +386,27 @@
         {% endif %}
     </div><!-- /grelha -->
 
+    <!-- ── Timeline de anos (direita) ── -->
+    {% if anos %}
+    <nav class="ano-timeline" id="ano-timeline" aria-label="Navegação por ano">
+        {% for a in anos %}
+        {% if not forloop.first %}
+            <div class="ano-timeline-line"></div>
+        {% endif %}
+        <button
+            class="ano-btn {% if a|stringformat:'s' == ano_selecionado %}active{% endif %}"
+            data-ano="{{ a }}"
+            data-href="?ano={{ a }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
+            onclick="window.location.href=this.dataset.href"
+            title="{{ a }}">
+            {{ a }}
+        </button>
+        {% endfor %}
+    </nav>
+    {% else %}
+    <div></div>
+    {% endif %}
+
 </div><!-- /pais-layout -->
 
 <!-- Botão voltar ao topo -->
@@ -385,47 +426,121 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 btnTopo.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
-/* ── Decade jump buttons (inserted dynamically) ─────────────── */
-(function addDecadeButtons() {
-    const timeline = document.getElementById('ano-timeline');
-    if (!timeline) return;
-    const anoBtns = Array.from(timeline.querySelectorAll('.ano-btn'));
-    let lastDecade = null;
+/* ── Constrói a timeline de décadas e articula com a de anos ── */
+(function buildDecadeTimeline() {
+    const anoTL = document.getElementById('ano-timeline');
+    const decadaTL = document.getElementById('decada-timeline');
+    if (!anoTL || !decadaTL) return;
+
+    const anoBtns = Array.from(anoTL.querySelectorAll('.ano-btn'));
+    const decadasVistas = [];
+    let ultimaDecada = null;
+
     anoBtns.forEach(btn => {
         const ano = parseInt(btn.dataset.ano, 10);
         const decada = Math.floor(ano / 10) * 10;
-        if (decada !== lastDecade) {
-            lastDecade = decada;
-            const decadaBtn = document.createElement('button');
-            decadaBtn.className = 'decada-btn';
-            decadaBtn.textContent = decada + 's';
-            decadaBtn.title = `Saltar para os anos ${decada}`;
-            decadaBtn.dataset.href = btn.dataset.href;
-            decadaBtn.addEventListener('click', e => {
-                e.stopPropagation();
-                window.location.href = decadaBtn.dataset.href;
-            });
-            timeline.insertBefore(decadaBtn, btn);
+        btn.dataset.decade = decada;
+        if (decada !== ultimaDecada) {
+            ultimaDecada = decada;
+            decadasVistas.push(decada);
         }
     });
+
+    decadasVistas.forEach((decada, i) => {
+        if (i > 0) {
+            const linha = document.createElement('div');
+            linha.className = 'decada-timeline-line';
+            decadaTL.appendChild(linha);
+        }
+        const btn = document.createElement('button');
+        btn.className = 'decada-btn';
+        btn.dataset.decade = decada;
+        btn.textContent = decada;
+        btn.title = `Década de ${decada}`;
+
+        const primBtn = anoBtns.find(b => {
+            const a = parseInt(b.dataset.ano, 10);
+            return a >= decada && a < decada + 10;
+        });
+        if (primBtn) btn.dataset.href = primBtn.dataset.href;
+
+        btn.addEventListener('click', () => {
+            if (btn.dataset.href) window.location.href = btn.dataset.href;
+        });
+
+        // Hover: destaca os anos dessa década na timeline da direita
+        btn.addEventListener('mouseenter', () => {
+            anoBtns.forEach(b => {
+                b.classList.toggle('highlight', parseInt(b.dataset.decade, 10) === decada);
+            });
+        });
+        btn.addEventListener('mouseleave', () => {
+            anoBtns.forEach(b => b.classList.remove('highlight'));
+        });
+
+        decadaTL.appendChild(btn);
+    });
+
+    // Hover nos anos: destaca a respetiva década
+    anoBtns.forEach(anoBtn => {
+        anoBtn.addEventListener('mouseenter', () => {
+            const dec = parseInt(anoBtn.dataset.decade, 10);
+            document.querySelectorAll('.decada-btn').forEach(db => {
+                db.classList.toggle('highlight', parseInt(db.dataset.decade, 10) === dec);
+            });
+        });
+        anoBtn.addEventListener('mouseleave', () => {
+            document.querySelectorAll('.decada-btn').forEach(db => db.classList.remove('highlight'));
+        });
+    });
+
+    // Estado inicial com base no parâmetro ?ano=
+    const anoParamInit = new URLSearchParams(window.location.search).get('ano');
+    if (anoParamInit) {
+        const decadaAtiva = Math.floor(parseInt(anoParamInit, 10) / 10) * 10;
+        document.querySelectorAll('.decada-btn').forEach(db => {
+            if (parseInt(db.dataset.decade, 10) === decadaAtiva) {
+                db.classList.add('active');
+                db.scrollIntoView({ block: 'nearest' });
+            }
+        });
+
+        // Posiciona o ano activo no topo da timeline da direita
+        const activeAnoBtn = anoBtns.find(b => b.dataset.ano === anoParamInit);
+        if (activeAnoBtn) {
+            const containerRect = anoTL.getBoundingClientRect();
+            const btnRect = activeAnoBtn.getBoundingClientRect();
+            anoTL.scrollTop += btnRect.top - containerRect.top;
+        }
+    }
 })();
 
-/* ── Highlight do año ativo na timeline via IntersectionObserver */
+/* ── Sincroniza ambas as timelines via IntersectionObserver ─── */
 const anoTimeline = document.getElementById('ano-timeline');
 if (anoTimeline) {
+    const anoParam = new URLSearchParams(window.location.search).get('ano');
+
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const ano = entry.target.id.replace('ano-', '');
+                const decadaAtiva = Math.floor(parseInt(ano, 10) / 10) * 10;
+
                 document.querySelectorAll('.ano-btn').forEach(btn => {
                     if (btn.dataset.ano === ano) {
                         btn.classList.add('active');
-                        // Scroll da timeline para manter o ano visível
                         btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                    } else {
-                        // Só remover active se não foi filtrado pelo URL
-                        const anoParam = new URLSearchParams(window.location.search).get('ano');
-                        if (!anoParam) btn.classList.remove('active');
+                    } else if (!anoParam) {
+                        btn.classList.remove('active');
+                    }
+                });
+
+                document.querySelectorAll('.decada-btn').forEach(btn => {
+                    if (parseInt(btn.dataset.decade, 10) === decadaAtiva) {
+                        btn.classList.add('active');
+                        btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    } else if (!anoParam) {
+                        btn.classList.remove('active');
                     }
                 });
             }
@@ -434,5 +549,100 @@ if (anoTimeline) {
 
     document.querySelectorAll('[id^="ano-"]').forEach(el => observer.observe(el));
 }
+
+/* ── Toggle coleção nos cards ───────────────────────────────── */
+document.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.btn-toggle-card');
+    if (!btn) return;
+    e.preventDefault();
+
+    const url  = btn.dataset.toggleUrl;
+    const csrf = document.cookie.match(/csrftoken=([^;]+)/);
+    const csrfToken = csrf ? csrf[1] : '';
+
+    btn.disabled = true;
+    try {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!resp.ok) throw new Error('Erro de servidor');
+        const data = await resp.json();
+        const agora = data.na_colecao;
+
+        btn.dataset.naColecao = agora ? '1' : '0';
+        btn.title = agora ? 'Na tua coleção (clica para remover)' : 'Adicionar à coleção';
+
+        const ico = btn.querySelector('.ico-toggle');
+        if (agora) {
+            ico.innerHTML = `<circle cx="13" cy="13" r="12" fill="#238636" stroke="#2ea043" stroke-width="1.5"/><polyline points="7,13.5 11,17.5 19,9" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+        } else {
+            ico.innerHTML = `<circle cx="13" cy="13" r="12" stroke="#30363d" stroke-width="1.5"/><polyline points="7,13.5 11,17.5 19,9" stroke="#444c56" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+        }
+    } catch (err) {
+        alert(err.message);
+    } finally {
+        btn.disabled = false;
+    }
+});
+
+/* ── Edição inline da descrição do país ─────────────────────── */
+(function setupDescricaoEdit() {
+    const btnEditar   = document.getElementById('btn-editar-descricao');
+    const btnCancelar = document.getElementById('btn-cancelar-descricao');
+    const form        = document.getElementById('form-editar-descricao');
+    const display     = document.getElementById('descricao-display');
+    const textoEl     = document.getElementById('descricao-texto');
+    const inputEl     = document.getElementById('input-descricao');
+    const erroEl      = document.getElementById('descricao-erro');
+    if (!btnEditar) return;
+
+    btnEditar.addEventListener('click', () => {
+        display.classList.add('d-none');
+        form.classList.remove('d-none');
+        inputEl.focus();
+    });
+
+    btnCancelar.addEventListener('click', () => {
+        form.classList.add('d-none');
+        display.classList.remove('d-none');
+        erroEl.classList.add('d-none');
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        erroEl.classList.add('d-none');
+        const csrf = document.cookie.match(/csrftoken=([^;]+)/);
+        const csrfToken = csrf ? csrf[1] : '';
+        const body = new FormData();
+        body.append('descricao', inputEl.value.trim());
+        body.append('csrfmiddlewaretoken', csrfToken);
+
+        try {
+            const resp = await fetch(form.dataset.url, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body,
+            });
+            if (!resp.ok) throw new Error('Erro de servidor');
+            const data = await resp.json();
+            if (data.ok) {
+                if (data.descricao) {
+                    textoEl.textContent = data.descricao;
+                } else {
+                    textoEl.innerHTML = '<span class="fst-italic" style="color:#484f58;">Sem descrição.</span>';
+                }
+                inputEl.value = data.descricao;
+                form.classList.add('d-none');
+                display.classList.remove('d-none');
+            } else {
+                throw new Error(data.error || 'Erro desconhecido');
+            }
+        } catch (err) {
+            erroEl.textContent = err.message;
+            erroEl.classList.remove('d-none');
+        }
+    });
+})();
 </script>
 {% endblock %}

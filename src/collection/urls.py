@@ -11,6 +11,7 @@ urlpatterns = [
     path('adicionar/<int:selo_id>/', views.adicionar_selo, name='adicionar_selo'),
     path('editar/<int:pk>/', views.editar_item, name='editar_item'),
     path('remover/<int:pk>/', views.remover_item, name='remover_item'),
+    path('toggle/<int:selo_id>/', views.toggle_colecao_rapido, name='toggle_colecao_rapido'),
     path('atualizar-localizacao/', views.atualizar_localizacao_bulk, name='atualizar_localizacao_bulk'),
     path('faltas/<int:pais_id>/pdf/', views.exportar_faltas_pdf, name='exportar_faltas_pdf'),
 ]

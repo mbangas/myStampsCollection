@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import Pais, Selo, Serie, Tema, Variante
+from .models import ImportacaoCatalogo, Pais, Selo, Serie, Tema, Variante
 
 
 @admin.register(Pais)
@@ -51,3 +51,22 @@ class VarianteAdmin(admin.ModelAdmin):
     list_display = ('selo', 'codigo', 'descricao')
     search_fields = ('codigo', 'descricao', 'selo__titulo')
     list_filter = ('selo__pais',)
+
+
+@admin.register(ImportacaoCatalogo)
+class ImportacaoCatalogoAdmin(admin.ModelAdmin):
+    """Admin das importações de catálogo do StampData."""
+
+    list_display = (
+        'pais', 'issuer_id', 'estado', 'fase_atual',
+        'selos_criados', 'selos_atualizados', 'iniciado_em', 'concluido_em',
+    )
+    list_filter = ('estado', 'pais')
+    readonly_fields = (
+        'pais', 'issuer_id', 'estado', 'fase_atual',
+        'total_ids', 'ids_processados',
+        'selos_criados', 'selos_atualizados', 'erros_importacao',
+        'imagens_total', 'imagens_processadas',
+        'mensagem_erro', 'iniciado_em', 'concluido_em', 'iniciado_por',
+    )
+    ordering = ('-iniciado_em',)

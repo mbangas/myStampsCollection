@@ -112,7 +112,7 @@
 
 <!-- Modal para criar novo catálogo de país/zona -->
 <div class="modal fade" id="modal-criar-pais" tabindex="-1" aria-labelledby="modal-criar-pais-label" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="background:#161b22;border-color:#30363d;color:#e6edf3;">
             <div class="modal-header" style="border-color:#30363d;">
                 <h5 class="modal-title" id="modal-criar-pais-label">
@@ -131,10 +131,10 @@
                     <div class="mb-3">
                         <label for="novo-pais-iso" class="form-label">Código ISO</label>
                         <input type="text" class="form-control" id="novo-pais-iso" maxlength="10" required
-                               placeholder="Ex.: PT-AZ">
+                               readonly placeholder="Preenchido automaticamente pelo país selecionado"
+                               style="background:#0d1117;cursor:not-allowed;color:#8b949e;">
                         <div class="form-text">
-                            Pode usar um código customizado (ex.: PT-AZ para Açores).
-                            Se o código já existir, será redirecionado para o catálogo existente.
+                            Código identificado através do país selecionado no mapa.
                         </div>
                     </div>
                     <div class="mb-3">
@@ -144,9 +144,63 @@
                     </div>
                     <div id="criar-pais-erro" class="alert alert-danger d-none"></div>
                 </form>
+
+                <!-- ── Secção de importação do StampData ── -->
+                <hr style="border-color:#30363d;">
+                <div id="secao-importar-stampdata">
+                    <h6 class="mb-3" style="color:#58a6ff;">
+                        <i class="bi bi-cloud-download me-2"></i>Importar Catálogo do StampData
+                    </h6>
+                    <div class="mb-3">
+                        <label for="stampdata-issuer-id" class="form-label">
+                            StampData Issuer ID
+                            <a href="https://www.stampdata.com/stamps.php" target="_blank" rel="noopener"
+                               class="ms-1 text-muted" style="font-size:.8rem;" title="Consultar StampData">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </label>
+                        <input type="number" class="form-control" id="stampdata-issuer-id"
+                               min="1" placeholder="Ex.: 39 (Portugal), 25 (Espanha)">
+                        <div class="form-text">
+                            Identifique o ID do emissor em stampdata.com (parâmetro <code>fissuer</code> no URL).
+                            O catálogo e as fotos serão descarregados automaticamente.
+                        </div>
+                    </div>
+                    <div id="importar-erro" class="alert alert-danger d-none"></div>
+
+                    <!-- Progresso da importação (visível durante e após o import) -->
+                    <div id="importar-progresso" class="d-none">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small id="importar-fase" style="color:#8b949e;font-size:.8rem;">A iniciar…</small>
+                            <small id="importar-pct-label" style="color:#58a6ff;font-size:.8rem;">0%</small>
+                        </div>
+                        <div class="progress mb-2" style="height:8px;background:#21262d;">
+                            <div id="importar-barra" class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                                 role="progressbar" style="width:0%"></div>
+                        </div>
+                        <div id="importar-detalhes" class="row g-2" style="font-size:.75rem;color:#8b949e;">
+                            <div class="col-6">
+                                <span id="imp-selos-criados">0</span> selos criados,
+                                <span id="imp-selos-atualizados">0</span> atualizados
+                            </div>
+                            <div class="col-6 text-end">
+                                Imagens: <span id="imp-imgs">0/0</span>
+                            </div>
+                        </div>
+                        <div id="importar-concluido" class="alert alert-success mt-2 d-none" style="font-size:.82rem;padding:.5rem .75rem;">
+                            <i class="bi bi-check-circle me-1"></i><span id="importar-concluido-msg"></span>
+                        </div>
+                        <div id="importar-erro-fatal" class="alert alert-danger mt-2 d-none" style="font-size:.82rem;padding:.5rem .75rem;">
+                            <i class="bi bi-exclamation-triangle me-1"></i><span id="importar-erro-fatal-msg"></span>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="border-color:#30363d;">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" id="btn-importar-stampdata">
+                    <i class="bi bi-cloud-download me-1"></i>Importar do StampData
+                </button>
                 <button type="button" class="btn btn-primary" id="btn-criar-pais">
                     <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
                 </button>
@@ -406,14 +460,14 @@ if (inputPesquisa) {
             html += `<a href="${catalogData.url}" class="btn btn-sm btn-primary">
                         <i class="bi bi-eye me-1"></i>Ver Catálogo
                      </a>`;
-            html += `<button class="btn btn-sm btn-outline-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}">
+            html += `<button class="btn btn-sm btn-outline-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="${catalogData.pk || ''}">
                         <i class="bi bi-plus-lg me-1"></i>Criar Novo Catálogo
                      </button>`;
             html += `</div>`;
         } else {
             html += `<div class="popup-info">Sem catálogo</div>`;
             html += `<div class="popup-actions">`;
-            html += `<button class="btn btn-sm btn-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}">
+            html += `<button class="btn btn-sm btn-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="">
                         <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
                      </button>`;
             html += `</div>`;
@@ -436,7 +490,7 @@ if (inputPesquisa) {
         // Ligar botão "Criar" dentro do popup
         popup.querySelectorAll('[data-criar-nome]').forEach(btn => {
             btn.addEventListener('click', () => {
-                abrirModalCriarPais(btn.dataset.criarNome, btn.dataset.criarIso);
+                abrirModalCriarPais(btn.dataset.criarNome, btn.dataset.criarIso, btn.dataset.criarPk);
             });
         });
     }
@@ -460,13 +514,25 @@ if (inputPesquisa) {
 });
 
 /* ═══ Modal – Criar novo catálogo ════════════════════════════════ */
-function abrirModalCriarPais(nome, iso) {
+const _modalCriarPaisEl = document.getElementById('modal-criar-pais');
+
+function abrirModalCriarPais(nome, iso, paisPkExistente) {
     document.getElementById('novo-pais-nome').value = nome || '';
     document.getElementById('novo-pais-iso').value  = iso || '';
     document.getElementById('novo-pais-descricao').value = '';
     document.getElementById('criar-pais-erro').classList.add('d-none');
+    document.getElementById('importar-erro').classList.add('d-none');
+    document.getElementById('importar-progresso').classList.add('d-none');
+    document.getElementById('importar-concluido').classList.add('d-none');
+    document.getElementById('importar-erro-fatal').classList.add('d-none');
+    document.getElementById('importar-barra').style.width = '0%';
+    document.getElementById('importar-barra').className =
+        'progress-bar bg-primary progress-bar-striped progress-bar-animated';
+    document.getElementById('stampdata-issuer-id').value = '';
+    // Armazena o pk do país (se já existir) para uso na importação
+    _modalCriarPaisEl.dataset.paisPk = paisPkExistente || '';
     document.getElementById('mapa-popup').style.display = 'none';
-    const modal = new bootstrap.Modal(document.getElementById('modal-criar-pais'));
+    const modal = new bootstrap.Modal(_modalCriarPaisEl);
     modal.show();
 }
 
@@ -502,12 +568,145 @@ document.getElementById('btn-criar-pais').addEventListener('click', async () => 
             return;
         }
 
-        // Redirecionar para o catálogo (novo ou existente)
-        window.location.href = data.url;
+        // Guarda o pk para importação StampData (sem redirecionar imediatamente)
+        if (data.pk) {
+            _modalCriarPaisEl.dataset.paisPk = data.pk;
+            erroEl.classList.add('d-none');
+            const okMsg = data.created
+                ? `Catálogo "${data.nome}" criado com sucesso. Pode agora importar do StampData ou fechar.`
+                : `Catálogo "${data.nome}" já existe. Pode importar do StampData abaixo.`;
+            erroEl.className = 'alert alert-success';
+            erroEl.textContent = okMsg;
+            erroEl.classList.remove('d-none');
+        } else {
+            window.location.href = data.url;
+        }
     } catch (err) {
         erroEl.textContent = 'Erro ao criar o catálogo. Tente novamente.';
         erroEl.classList.remove('d-none');
     }
+});
+
+/* ═══ Importação StampData ═══════════════════════════════════════ */
+let _importacaoId = null;
+let _pollingInterval = null;
+
+function iniciarPollingImportacao(importacaoId) {
+    _importacaoId = importacaoId;
+    document.getElementById('importar-progresso').classList.remove('d-none');
+    document.getElementById('importar-concluido').classList.add('d-none');
+    document.getElementById('importar-erro-fatal').classList.add('d-none');
+    document.getElementById('btn-importar-stampdata').disabled = true;
+    document.getElementById('btn-importar-stampdata').innerHTML =
+        '<span class="spinner-border spinner-border-sm me-1"></span>A importar…';
+
+    if (_pollingInterval) clearInterval(_pollingInterval);
+    _pollingInterval = setInterval(() => _actualizarProgresso(importacaoId), 2500);
+    _actualizarProgresso(importacaoId);
+}
+
+async function _actualizarProgresso(importacaoId) {
+    try {
+        const resp = await fetch(
+            `{% url 'catalog:estado_importacao' %}?id=${importacaoId}`,
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+        );
+        if (!resp.ok) return;
+        const d = await resp.json();
+        if (d.nenhuma || d.error) return;
+
+        document.getElementById('importar-fase').textContent = d.fase_atual || '…';
+        document.getElementById('importar-pct-label').textContent = d.progresso_pct + '%';
+        const barra = document.getElementById('importar-barra');
+        barra.style.width = d.progresso_pct + '%';
+
+        document.getElementById('imp-selos-criados').textContent = d.selos_criados;
+        document.getElementById('imp-selos-atualizados').textContent = d.selos_atualizados;
+        document.getElementById('imp-imgs').textContent =
+            d.imagens_processadas + '/' + (d.imagens_total || '?');
+
+        if (d.estado === 'concluido') {
+            clearInterval(_pollingInterval);
+            barra.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            barra.classList.add('bg-success');
+            document.getElementById('importar-concluido').classList.remove('d-none');
+            document.getElementById('importar-concluido-msg').textContent =
+                `Importação concluída! ${d.selos_criados} selos criados, ` +
+                `${d.selos_atualizados} atualizados, ${d.imagens_processadas} imagens.`;
+            document.getElementById('btn-importar-stampdata').disabled = false;
+            document.getElementById('btn-importar-stampdata').innerHTML =
+                '<i class="bi bi-cloud-download me-1"></i>Importar do StampData';
+        } else if (d.estado === 'erro') {
+            clearInterval(_pollingInterval);
+            barra.classList.remove('progress-bar-animated');
+            barra.classList.add('bg-danger');
+            document.getElementById('importar-erro-fatal').classList.remove('d-none');
+            document.getElementById('importar-erro-fatal-msg').textContent =
+                d.mensagem_erro || 'Ocorreu um erro durante a importação.';
+            document.getElementById('btn-importar-stampdata').disabled = false;
+            document.getElementById('btn-importar-stampdata').innerHTML =
+                '<i class="bi bi-cloud-download me-1"></i>Importar do StampData';
+        }
+    } catch (_) { /* ignora falhas de rede passageiras */ }
+}
+
+document.getElementById('btn-importar-stampdata').addEventListener('click', async () => {
+    const paisPk  = document.getElementById('modal-criar-pais').dataset.paisPk || '';
+    const issuerId = document.getElementById('stampdata-issuer-id').value.trim();
+    const erroEl  = document.getElementById('importar-erro');
+
+    erroEl.classList.add('d-none');
+
+    if (!issuerId || parseInt(issuerId) <= 0) {
+        erroEl.textContent = 'Indique o StampData Issuer ID antes de importar.';
+        erroEl.classList.remove('d-none');
+        return;
+    }
+
+    if (!paisPk) {
+        erroEl.textContent = 'Primeiro crie o catálogo do país (botão "Criar Catálogo") ou selecione um país existente.';
+        erroEl.classList.remove('d-none');
+        return;
+    }
+
+    const csrfToken = document.querySelector('#form-criar-pais [name=csrfmiddlewaretoken]').value;
+
+    try {
+        const resp = await fetch('{% url "catalog:importar_stampdata" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+            },
+            body: new URLSearchParams({ pais_pk: paisPk, issuer_id: issuerId }),
+        });
+
+        const data = await resp.json();
+
+        if (data.error) {
+            erroEl.textContent = data.error;
+            erroEl.classList.remove('d-none');
+            return;
+        }
+
+        iniciarPollingImportacao(data.importacao_id);
+    } catch (err) {
+        erroEl.textContent = 'Erro ao iniciar importação. Tente novamente.';
+        erroEl.classList.remove('d-none');
+    }
+});
+
+// Quando o modal abre, verificar se já existe importação em curso e retomar polling
+document.getElementById('modal-criar-pais').addEventListener('show.bs.modal', async () => {
+    try {
+        const resp = await fetch('{% url "catalog:estado_importacao" %}',
+            { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!resp.ok) return;
+        const d = await resp.json();
+        if (d.a_correr && d.id) {
+            iniciarPollingImportacao(d.id);
+        }
+    } catch (_) {}
 });
 </script>
 {% endblock %}

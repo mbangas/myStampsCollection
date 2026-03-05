@@ -45,6 +45,8 @@
 }
 /* Estilos das linhas selecionadas */
 tr.selecionado { background: rgba(31,111,235,.07) !important; }
+/* Garantir visibilidade das colunas numéricas */
+.table td.text-center { color: var(--fg, #e6edf3); }
 </style>
 {% endblock %}
 
@@ -105,11 +107,11 @@ tr.selecionado { background: rgba(31,111,235,.07) !important; }
 
 <!-- Filtros -->
 <form method="get" class="row g-2 mb-4">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <input type="text" name="q" value="{{ pesquisa }}" class="form-control form-control-sm"
                placeholder="Pesquisar na coleção…">
     </div>
-    <div class="col-md-4">
+    <div class="col-md-2">
         <select name="pais" class="form-select form-select-sm">
             <option value="">Todos os países</option>
             {% for p in paises %}
@@ -119,11 +121,25 @@ tr.selecionado { background: rgba(31,111,235,.07) !important; }
             {% endfor %}
         </select>
     </div>
+    <div class="col-md-2">
+        <select name="condicao" class="form-select form-select-sm">
+            <option value="">Todas as condições</option>
+            {% for val, label in condicao_choices %}
+            <option value="{{ val }}" {% if val == condicao_selecionada %}selected{% endif %}>
+                {{ label }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <input type="number" name="ano" value="{{ ano_filtro }}" class="form-control form-control-sm"
+               placeholder="Ano" min="1800" max="2100">
+    </div>
     <div class="col-md-2 d-flex gap-1">
         <button class="btn btn-primary btn-sm w-100" type="submit">
             <i class="bi bi-funnel"></i>
         </button>
-        {% if pesquisa or pais_selecionado %}
+        {% if pesquisa or pais_selecionado or condicao_selecionada or ano_filtro %}
         <a href="{% url 'collection:colecao' %}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-x-lg"></i>
         </a>

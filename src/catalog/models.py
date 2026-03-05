@@ -1,6 +1,8 @@
 """Modelos da aplicação Catálogo."""
 
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Pais(models.Model):
@@ -201,3 +203,85 @@ class Variante(models.Model):
 
     def __str__(self) -> str:
         return f'{self.selo} – {self.codigo}'
+
+
+class ImportacaoCatalogo(models.Model):
+    """Regista o estado e o progresso de uma importação do StampData."""
+
+    ESTADO_A_CORRER = 'a_correr'
+    ESTADO_CONCLUIDO = 'concluido'
+    ESTADO_ERRO = 'erro'
+
+    ESTADO_CHOICES = [
+        (ESTADO_A_CORRER, 'A correr'),
+        (ESTADO_CONCLUIDO, 'Concluído'),
+        (ESTADO_ERRO, 'Erro'),
+    ]
+
+    pais = models.ForeignKey(
+        Pais,
+        on_delete=models.CASCADE,
+        related_name='importacoes',
+        verbose_name='País',
+    )
+    issuer_id = models.IntegerField(verbose_name='StampData Issuer ID')
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default=ESTADO_A_CORRER,
+        verbose_name='Estado',
+    )
+    fase_atual = models.CharField(max_length=300, blank=True, verbose_name='Fase atual')
+    total_ids = models.IntegerField(default=0, verbose_name='Total de IDs encontrados')
+    ids_processados = models.IntegerField(default=0, verbose_name='IDs processados (scrape)')
+    selos_criados = models.IntegerField(default=0, verbose_name='Selos criados')
+    selos_atualizados = models.IntegerField(default=0, verbose_name='Selos atualizados')
+    erros_importacao = models.IntegerField(default=0, verbose_name='Erros de importação')
+    imagens_total = models.IntegerField(default=0, verbose_name='Imagens a descarregar')
+    imagens_processadas = models.IntegerField(default=0, verbose_name='Imagens processadas')
+    mensagem_erro = models.TextField(blank=True, verbose_name='Mensagem de erro')
+    iniciado_em = models.DateTimeField(auto_now_add=True, verbose_name='Iniciado em')
+    concluido_em = models.DateTimeField(null=True, blank=True, verbose_name='Concluído em')
+    iniciado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='importacoes_catalogo',
+        verbose_name='Iniciado por',
+    )
+
+    class Meta:
+        verbose_name = 'Importação de Catálogo'
+        verbose_name_plural = 'Importações de Catálogo'
+        ordering = ['-iniciado_em']
+
+    def __str__(self) -> str:
+        return f'Importação {self.pais.nome} (issuer={self.issuer_id}) – {self.get_estado_display()}'
+
+    @property
+    def progresso_pct(self) -> int:
+        """Percentagem de progresso global (0–100)."""
+        # Phase 1 (scrape): 0–60%, Phase 2 (images): 60–100%
+        if self.total_ids == 0:
+            return 0
+        scrape_pct = min(self.ids_processados / self.total_ids, 1.0) * 60
+        if self.imagens_total > 0:
+            img_pct = min(self.imagens_processadas / self.imagens_total, 1.0) * 40
+        else:
+            img_pct = 40 if self.estado == self.ESTADO_CONCLUIDO else 0
+        return int(scrape_pct + img_pct)
+
+    def marcar_concluido(self) -> None:
+        """Marca a importação como concluída."""
+        self.estado = self.ESTADO_CONCLUIDO
+        self.concluido_em = timezone.now()
+        self.save(update_fields=['estado', 'concluido_em', 'fase_atual'])
+
+    def marcar_erro(self, mensagem: str) -> None:
+        """Marca a importação como falhada."""
+        self.estado = self.ESTADO_ERRO
+        self.concluido_em = timezone.now()
+        self.mensagem_erro = mensagem[:2000]
+        self.save(update_fields=['estado', 'concluido_em', 'mensagem_erro', 'fase_atual'])
+

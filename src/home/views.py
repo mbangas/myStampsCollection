@@ -11,7 +11,7 @@ from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from catalog.models import Pais, Selo, Serie
+from catalog.models import ImportacaoCatalogo, Pais, Selo, Serie
 from collection.models import ItemColecao
 
 logger = logging.getLogger(__name__)
@@ -172,6 +172,14 @@ def landing_page(request: HttpRequest) -> HttpResponse:
     except Exception:
         noticias = []
 
+    # Importação de catálogo activa ou mais recente (para a caixa de progresso)
+    importacao_activa = (
+        ImportacaoCatalogo.objects.filter(estado=ImportacaoCatalogo.ESTADO_A_CORRER)
+        .select_related('pais')
+        .first()
+        or ImportacaoCatalogo.objects.select_related('pais').first()
+    )
+
     context: dict[str, Any] = {
         'total_paises': total_paises,
         'total_selos': total_selos,
@@ -181,6 +189,7 @@ def landing_page(request: HttpRequest) -> HttpResponse:
         'total_repetidos': total_repetidos,
         'noticias': noticias,
         'links_uteis': LINKS_UTEIS,
+        'importacao_activa': importacao_activa,
     }
 
     return render(request, 'home/landing.html', context)

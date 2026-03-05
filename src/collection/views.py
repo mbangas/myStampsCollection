@@ -26,11 +26,17 @@ def vista_colecao(request: HttpRequest) -> HttpResponse:
     # Filtros
     pais_id = request.GET.get('pais', '').strip()
     pesquisa = request.GET.get('q', '').strip()
+    condicao = request.GET.get('condicao', '').strip()
+    ano = request.GET.get('ano', '').strip()
 
     if pais_id:
         itens = itens.filter(stamp__pais_id=pais_id)
     if pesquisa:
         itens = itens.filter(stamp__titulo__icontains=pesquisa)
+    if condicao:
+        itens = itens.filter(condicao=condicao)
+    if ano:
+        itens = itens.filter(stamp__ano=ano)
 
     # Indicadores
     totais = request.user.itens_colecao.aggregate(
@@ -56,6 +62,9 @@ def vista_colecao(request: HttpRequest) -> HttpResponse:
         'paises': paises,
         'pais_selecionado': pais_id,
         'pesquisa': pesquisa,
+        'condicao_selecionada': condicao,
+        'ano_filtro': ano,
+        'condicao_choices': ItemColecao.CONDICAO_CHOICES,
     }
     return render(request, 'collection/colecao.html', context)
 
@@ -123,6 +132,31 @@ def remover_item(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect('collection:colecao')
 
     return render(request, 'collection/confirmar_remocao.html', {'item': item})
+
+
+@login_required
+def toggle_colecao_rapido(request: HttpRequest, selo_id: int) -> JsonResponse:
+    """Adiciona ou remove rapidamente um selo da coleção (1 unidade, usado).
+
+    Responde com JSON: {"na_colecao": bool}.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    selo = get_object_or_404(Selo, pk=selo_id)
+    item = request.user.itens_colecao.filter(stamp=selo).first()
+
+    if item:
+        item.delete()
+        return JsonResponse({'na_colecao': False})
+
+    novo_item = ItemColecao.objects.create(
+        utilizador=request.user,
+        stamp=selo,
+        quantidade_possuida=1,
+        condicao='used',
+    )
+    return JsonResponse({'na_colecao': True, 'item_pk': novo_item.pk})
 
 
 @login_required
