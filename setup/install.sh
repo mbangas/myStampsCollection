@@ -357,6 +357,15 @@ step_fix_lxc_overlay() {
     active_driver=$(docker info --format '{{.Driver}}' 2>/dev/null || echo "?")
     info "Storage driver activo: ${active_driver}"
     log "Storage driver inicial: ${active_driver}"
+
+    # Permitir que processos sem root abram portas baixas (<=80) dentro dos
+    # contentores -- necessario em Proxmox LXC onde o runc nao tem permissao
+    # para escrever este sysctl no namespace de rede do contentor.
+    info "A configurar net.ipv4.ip_unprivileged_port_start (Proxmox LXC)..."
+    sysctl -w net.ipv4.ip_unprivileged_port_start=0             >> "$LOG" 2>&1 || true
+    echo "net.ipv4.ip_unprivileged_port_start=0" \
+        > /etc/sysctl.d/99-docker-lxc.conf
+    log "net.ipv4.ip_unprivileged_port_start=0 definido e persistido."
 }
 
 # -- Mostrar erro de nesting Proxmox e parar -----------------------------------
