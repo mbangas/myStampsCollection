@@ -11,12 +11,10 @@ python manage.py migrate --noinput
 echo "📦 Ficheiros estáticos..."
 python manage.py collectstatic --noinput
 
-echo "📋 Importar catálogo Portugal (StampData)..."
-python -u tools/importar_selos_portugal.py --pular-se-populado
-
-# Lança em background: imagens PT → catálogo ES → imagens ES
-echo "⏳ A lançar carregamento de dados em background (PT imagens → ES catálogo → ES imagens)..."
-sh /app/docker/carregar_dados_bg.sh &
+# Carrega fixtures (BD + imagens) se os volumes estiverem vazios.
+# Em nova infraestrutura restaura tudo; em reinício normal salta automaticamente.
+echo "📋 A verificar/carregar catálogo de selos (fixtures)…"
+python manage.py carregar_catalogo
 
 # Django arranca como processo principal (PID substituído)
 echo "🚀 A iniciar servidor de desenvolvimento..."

@@ -11,6 +11,9 @@ db.sqlite3
 /staticfiles/
 /media/
 
+# Fixtures — catalog.json é versionado; media_stamps.tar.gz é gerido fora do git (>100 MB)
+fixtures/media_stamps.tar.gz
+
 # Variáveis de ambiente
 .env
 

@@ -17,6 +17,8 @@ __pycache__/
 db.sqlite3
 /staticfiles/
 /media/
+# NOTA: fixtures/ não está excluído — catalog.json e media_stamps.tar.gz
+#       são incluídos na imagem para permitir arranque sem re-importação.
 
 # Variáveis de ambiente (não incluir no contexto de build)
 .env

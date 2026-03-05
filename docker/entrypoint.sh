@@ -36,13 +36,11 @@ python manage.py migrate --noinput
 echo "📦 A recolher ficheiros estáticos…"
 python manage.py collectstatic --noinput --clear
 
-# ── Catálogo Portugal (importa a partir do cache StampData) ───────────────────
-echo "📋 A importar catálogo de selos (Portugal/StampData)…"
-python -u tools/importar_selos_portugal.py --pular-se-populado
-
-# ── Dados em background: imagens PT → catálogo ES → imagens ES ────────────────
-echo "⏳ A lançar carregamento de dados em background (PT imagens → ES catálogo → ES imagens)…"
-sh /app/docker/carregar_dados_bg.sh &
+# ── Catálogo: carrega fixtures (BD + imagens) se o volume estiver vazio ───────
+# Em nova infraestrutura (volumes vazios) carrega fixtures incluídas na imagem.
+# Se os volumes já tiverem dados (reinício normal) salta automaticamente.
+echo "📋 A verificar/carregar catálogo de selos (fixtures)…"
+python manage.py carregar_catalogo
 
 # ── Inicia o servidor Gunicorn ────────────────────────────────────────────────
 echo "🚀 A iniciar Gunicorn…"
