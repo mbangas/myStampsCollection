@@ -31,6 +31,11 @@ readonly INSTALLER_VERSION="2.0"
 readonly REPO_URL="https://github.com/mbangas/myStampsCollection.git"
 readonly LOG="/tmp/mystamps_install_$(date +%Y%m%d_%H%M%S).log"
 
+# Enviar trace de cada comando para o log (debug automatico)
+exec 3>>"$LOG"
+BASH_XTRACEFD=3
+set -x
+
 APP_DIR="/opt/mystamps"
 APP_PORT="80"
 DB_PASSWORD=""
@@ -62,23 +67,25 @@ step() {
 # -- Tratamento de erros -------------------------------------------------------
 handle_error() {
     trap '' ERR
+    set +eu  # desligar errexit/nounset dentro do handler
     local _ec=$?
     local _ln=${1:-"?"}
 
-    echo "" >&2
-    echo "======================================================================" >&2
-    echo "  ERRO DURANTE A INSTALACAO" >&2
-    echo "======================================================================" >&2
-    echo "" >&2
-    echo "  Passo  : ${_CURRENT_STEP}" >&2
-    echo "  Linha  : ${_ln}" >&2
-    echo "  Codigo : ${_ec}" >&2
-    echo "  Log    : ${LOG}" >&2
-    echo "" >&2
-    echo "  Ultimas linhas do log:" >&2
-    echo "  ------------------------------------------------------------------" >&2
-    tail -20 "${LOG}" 2>/dev/null | sed 's/^/    /' >&2 || true
-    echo "" >&2
+    # Escrever SEMPRE no stdout E stderr (garante visibilidade)
+    echo ""
+    echo "======================================================================"
+    echo "  ERRO DURANTE A INSTALACAO"
+    echo "======================================================================"
+    echo ""
+    echo "  Passo  : ${_CURRENT_STEP}"
+    echo "  Linha  : ${_ln}"
+    echo "  Codigo : ${_ec}"
+    echo "  Log    : ${LOG}"
+    echo ""
+    echo "  Ultimas linhas do log:"
+    echo "  ------------------------------------------------------------------"
+    tail -20 "${LOG}" 2>/dev/null | sed 's/^/    /' || true
+    echo ""
 
     echo "[$(date '+%H:%M:%S')] ERRO: passo=[${_CURRENT_STEP}] linha=${_ln} codigo=${_ec}" >> "${LOG}" 2>/dev/null || true
 
@@ -360,7 +367,9 @@ _wait_for_docker() {
             return 0
         fi
     done
-    [[ $waited -gt 0 ]] && info "Docker operacional apos ${waited}s."
+    if [[ $waited -gt 0 ]]; then
+        info "Docker operacional apos ${waited}s."
+    fi
 }
 
 # ==============================================================================
@@ -577,7 +586,7 @@ step_create_env() {
         log "SECRET_KEY gerada."
 
         SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}') || true
-        [[ -z "$SERVER_IP" ]] && SERVER_IP="127.0.0.1"
+        if [[ -z "$SERVER_IP" ]]; then SERVER_IP="127.0.0.1"; fi
 
         local allowed_hosts="localhost,127.0.0.1,${SERVER_IP}"
 
@@ -865,7 +874,7 @@ step_health_check() {
         fi
     done
 
-    [[ $waited -gt 0 ]] && echo ""
+    if [[ $waited -gt 0 ]]; then echo ""; fi
     info "Aplicacao disponivel e a responder!"
 }
 
@@ -957,8 +966,8 @@ progress 100 "Instalacao concluida!"
 trap '' ERR
 
 # -- Resumo final ---------------------------------------------------------------
-_FINAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-[[ -z "$_FINAL_IP" ]] && _FINAL_IP="127.0.0.1"
+_FINAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}') || true
+if [[ -z "$_FINAL_IP" ]]; then _FINAL_IP="127.0.0.1"; fi
 _SUMMARY="/root/mystamps-access.txt"
 
 cat > "$_SUMMARY" << SUMMARY_EOF
