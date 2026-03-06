@@ -16,4 +16,5 @@ urlpatterns = [
     path('criar-pais/', views.vista_criar_pais, name='criar_pais'),
     path('importar-stampdata/', views.vista_iniciar_importacao_stampdata, name='importar_stampdata'),
     path('importar-stampdata/estado/', views.vista_estado_importacao, name='estado_importacao'),
+    path('importar-stampdata/retomar/', views.vista_retomar_importacao, name='retomar_importacao'),
 ]

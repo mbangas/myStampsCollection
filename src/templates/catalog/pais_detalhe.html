@@ -208,6 +208,63 @@
     {% endif %}
 </div>
 
+{% if pais.total_selos == 0 and user.perfil.is_admin %}
+<!-- Importação StampData – catálogo vazio -->
+<div class="card mb-4" id="box-importar-stampdata" style="border-color:#30363d;background:#161b22;">
+    <div class="card-body">
+        <h6 class="mb-1" style="color:#58a6ff;">
+            <i class="bi bi-cloud-download me-2"></i>Catálogo vazio – Importar do StampData
+        </h6>
+        <p class="text-muted small mb-3">
+            Este catálogo ainda não tem selos. Pode importá-los automaticamente a partir do StampData.
+        </p>
+        <div class="mb-3">
+            <label for="stampdata-issuer-id-pais" class="form-label">
+                StampData Issuer ID
+                <a href="https://www.stampdata.com/stamps.php" target="_blank" rel="noopener"
+                   class="ms-1 text-muted" style="font-size:.8rem;" title="Consultar StampData">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                </a>
+            </label>
+            <input type="number" class="form-control" id="stampdata-issuer-id-pais"
+                   min="1" placeholder="Ex.: 39 (Portugal), 25 (Espanha)">
+            <div class="form-text">
+                Identifique o ID do emissor em stampdata.com (parâmetro <code>fissuer</code> no URL).
+            </div>
+        </div>
+        <div id="importar-pais-erro" class="alert alert-danger d-none"></div>
+        <div id="importar-pais-progresso" class="d-none mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <small id="importar-pais-fase" style="color:#8b949e;font-size:.8rem;">A iniciar…</small>
+                <small id="importar-pais-pct-label" style="color:#58a6ff;font-size:.8rem;">0%</small>
+            </div>
+            <div class="progress mb-2" style="height:8px;background:#21262d;">
+                <div id="importar-pais-barra" class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                     role="progressbar" style="width:0%"></div>
+            </div>
+            <div class="row g-2" style="font-size:.75rem;color:#8b949e;">
+                <div class="col-6">
+                    <span id="imp-pais-selos-criados">0</span> selos criados,
+                    <span id="imp-pais-selos-atualizados">0</span> atualizados
+                </div>
+                <div class="col-6 text-end">
+                    Imagens: <span id="imp-pais-imgs">0/0</span>
+                </div>
+            </div>
+            <div id="importar-pais-concluido" class="alert alert-success mt-2 d-none" style="font-size:.82rem;padding:.5rem .75rem;">
+                <i class="bi bi-check-circle me-1"></i><span id="importar-pais-concluido-msg"></span>
+            </div>
+            <div id="importar-pais-erro-fatal" class="alert alert-danger mt-2 d-none" style="font-size:.82rem;padding:.5rem .75rem;">
+                <i class="bi bi-exclamation-triangle me-1"></i><span id="importar-pais-erro-fatal-msg"></span>
+            </div>
+        </div>
+        <button type="button" class="btn btn-success" id="btn-importar-pais-stampdata">
+            <i class="bi bi-cloud-download me-1"></i>Importar do StampData
+        </button>
+    </div>
+</div>
+{% endif %}
+
 <!-- Filtros -->
 <form method="get" class="row g-2 mb-2" id="form-filtros">
     <div class="col-md-5">
@@ -655,5 +712,99 @@ document.addEventListener('click', async function (e) {
         }
     });
 })();
+
+{% if pais.total_selos == 0 and user.perfil.is_admin %}
+/* ── Importação StampData (catálogo vazio) ──────────────────── */
+(function setupImportacaoPais() {
+    const PAIS_PK = '{{ pais.pk }}';
+    let _pollingInterval = null;
+
+    function iniciarPollingImportacao(importacaoId) {
+        if (_pollingInterval) clearInterval(_pollingInterval);
+        _pollingInterval = setInterval(() => actualizarProgresso(importacaoId), 2500);
+        actualizarProgresso(importacaoId);
+    }
+
+    async function actualizarProgresso(importacaoId) {
+        try {
+            const resp = await fetch(
+                `{% url 'catalog:estado_importacao' %}?id=${importacaoId}`,
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } }
+            );
+            if (!resp.ok) return;
+            const data = await resp.json();
+
+            document.getElementById('importar-pais-progresso').classList.remove('d-none');
+            document.getElementById('importar-pais-fase').textContent = data.fase_atual || '—';
+            const pct = data.progresso_pct || 0;
+            document.getElementById('importar-pais-pct-label').textContent = pct + '%';
+            const barra = document.getElementById('importar-pais-barra');
+            barra.style.width = pct + '%';
+            document.getElementById('imp-pais-selos-criados').textContent  = data.selos_criados  || 0;
+            document.getElementById('imp-pais-selos-atualizados').textContent = data.selos_atualizados || 0;
+            document.getElementById('imp-pais-imgs').textContent =
+                `${data.imagens_processadas || 0}/${data.imagens_total || 0}`;
+
+            if (!data.a_correr) {
+                clearInterval(_pollingInterval);
+                barra.classList.remove('progress-bar-striped', 'progress-bar-animated');
+
+                if (data.estado === 'concluido') {
+                    barra.classList.replace('bg-primary', 'bg-success');
+                    document.getElementById('importar-pais-concluido-msg').textContent =
+                        `Importados ${data.selos_criados} selos. A recarregar…`;
+                    document.getElementById('importar-pais-concluido').classList.remove('d-none');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else if (data.estado === 'erro') {
+                    barra.classList.replace('bg-primary', 'bg-danger');
+                    document.getElementById('importar-pais-erro-fatal-msg').textContent =
+                        data.mensagem_erro || 'Erro desconhecido.';
+                    document.getElementById('importar-pais-erro-fatal').classList.remove('d-none');
+                }
+            }
+        } catch (_) {}
+    }
+
+    document.getElementById('btn-importar-pais-stampdata').addEventListener('click', async () => {
+        const issuerId = document.getElementById('stampdata-issuer-id-pais').value.trim();
+        const erroEl   = document.getElementById('importar-pais-erro');
+        erroEl.classList.add('d-none');
+
+        if (!issuerId || parseInt(issuerId) <= 0) {
+            erroEl.textContent = 'Indique o StampData Issuer ID antes de importar.';
+            erroEl.classList.remove('d-none');
+            return;
+        }
+
+        const csrf = document.cookie.match(/csrftoken=([^;]+)/);
+        const csrfToken = csrf ? csrf[1] : '';
+
+        try {
+            const resp = await fetch('{% url "catalog:importar_stampdata" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: new URLSearchParams({ pais_pk: PAIS_PK, issuer_id: issuerId }),
+            });
+
+            const data = await resp.json();
+
+            if (data.error) {
+                erroEl.textContent = data.error;
+                erroEl.classList.remove('d-none');
+                return;
+            }
+
+            document.getElementById('btn-importar-pais-stampdata').disabled = true;
+            iniciarPollingImportacao(data.importacao_id);
+        } catch (err) {
+            erroEl.textContent = 'Erro ao iniciar importação. Tente novamente.';
+            erroEl.classList.remove('d-none');
+        }
+    });
+})();
+{% endif %}
 </script>
 {% endblock %}

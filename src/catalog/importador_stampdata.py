@@ -44,6 +44,17 @@ HEADERS = {
 
 _EXCLUIR_SRC = ("flag", "logo", "icon", "button", "blank.gif", "spacer", "arrow", "nav")
 
+# ─── Rastreamento de threads activas ──────────────────────────────────────────
+_importacoes_activas: set[int] = set()
+_lock_activas = threading.Lock()
+
+
+def importacao_esta_activa(importacao_id: int) -> bool:
+    """Devolve True se existe uma thread em execução para este ID de importação."""
+    with _lock_activas:
+        return importacao_id in _importacoes_activas
+
+
 MAPEAMENTO_TEMAS = {
     "bird": "Fauna", "fish": "Fauna", "animal": "Fauna", "fauna": "Fauna",
     "mammal": "Fauna", "insect": "Fauna", "reptile": "Fauna",
@@ -574,10 +585,15 @@ def executar_importacao(importacao_id: int) -> None:
     # Garante conexão DB limpa nesta thread
     close_old_connections()
 
+    with _lock_activas:
+        _importacoes_activas.add(importacao_id)
+
     try:
         importacao = ImportacaoCatalogo.objects.select_related("pais").get(pk=importacao_id)
     except ImportacaoCatalogo.DoesNotExist:
         logger.error("ImportacaoCatalogo id=%d não encontrado.", importacao_id)
+        with _lock_activas:
+            _importacoes_activas.discard(importacao_id)
         return
 
     pais = importacao.pais
@@ -717,9 +733,17 @@ def executar_importacao(importacao_id: int) -> None:
             .order_by("numero_catalogo")
         )
         total_sem_imagem = len(selos_sem_imagem)
+
+        # Contabilizar imagens já descarregadas para retomar o progresso corretamente
+        ja_com_imagem = Selo.objects.filter(pais=pais).exclude(
+            Q(imagem="") | Q(imagem__isnull=True)
+        ).count()
+        total_imagens_global = ja_com_imagem + total_sem_imagem
+
         prog(
-            f"Importação concluída. A descarregar imagens ({total_sem_imagem} selos sem imagem)…",
-            imagens_total=total_sem_imagem,
+            f"A descarregar imagens ({total_sem_imagem} selos sem imagem)…",
+            imagens_total=total_imagens_global,
+            imagens_processadas=ja_com_imagem,
         )
 
         # ── Fase 4: Descarregar imagens (paralelo) ────────────────────────────
@@ -752,15 +776,15 @@ def executar_importacao(importacao_id: int) -> None:
                         imagens_ok += 1
                     if imagens_processadas % 50 == 0 or imagens_processadas == len(tarefas_imagens):
                         prog(
-                            f"Imagens: {imagens_processadas}/{total_sem_imagem} "
-                            f"({imagens_ok} descarregadas)…",
-                            imagens_processadas=imagens_processadas,
+                            f"Imagens: {ja_com_imagem + imagens_processadas}/{total_imagens_global} "
+                            f"({ja_com_imagem + imagens_ok} descarregadas)…",
+                            imagens_processadas=ja_com_imagem + imagens_processadas,
                         )
 
         prog(
             f"Concluído! Selos criados: {criados}, atualizados: {atualizados}, "
-            f"imagens: {imagens_ok}/{total_sem_imagem}.",
-            imagens_processadas=total_sem_imagem,
+            f"imagens: {ja_com_imagem + imagens_ok}/{total_imagens_global}.",
+            imagens_processadas=total_imagens_global,
         )
         importacao.marcar_concluido()
 
@@ -774,3 +798,5 @@ def executar_importacao(importacao_id: int) -> None:
             pass
     finally:
         close_old_connections()
+        with _lock_activas:
+            _importacoes_activas.discard(importacao_id)

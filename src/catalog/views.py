@@ -287,17 +287,29 @@ def vista_iniciar_importacao_stampdata(request: HttpRequest) -> JsonResponse:
     pais = get_object_or_404(Pais, pk=pais_pk)
 
     # Verificar se já existe uma importação em curso
+    from .importador_stampdata import executar_importacao, importacao_esta_activa  # noqa: F811
+
     importacao_activa = ImportacaoCatalogo.objects.filter(
         estado=ImportacaoCatalogo.ESTADO_A_CORRER
     ).select_related('pais').first()
 
-    if importacao_activa:
+    if importacao_activa and importacao_esta_activa(importacao_activa.pk):
         return JsonResponse({
             'error': (
                 f'Já está a decorrer uma importação para "{importacao_activa.pais.nome}". '
                 'Aguarde que conclua antes de iniciar outra.'
             ),
             'importacao_id': importacao_activa.pk,
+        }, status=409)
+    elif importacao_activa and not importacao_esta_activa(importacao_activa.pk):
+        # Importação ficou presa (thread morreu) — informar o utilizador para retomar
+        return JsonResponse({
+            'error': (
+                f'Existe uma importação interrompida para "{importacao_activa.pais.nome}". '
+                'Use o botão "Retomar" para continuar o carregamento.'
+            ),
+            'importacao_id': importacao_activa.pk,
+            'interrompida': True,
         }, status=409)
 
     # Criar registo de importação
@@ -310,7 +322,7 @@ def vista_iniciar_importacao_stampdata(request: HttpRequest) -> JsonResponse:
     )
 
     # Lançar thread em background
-    from .importador_stampdata import executar_importacao  # importação local para evitar ciclos
+    from .importador_stampdata import executar_importacao  # noqa: F811
 
     t = threading.Thread(
         target=executar_importacao,
@@ -351,6 +363,8 @@ def vista_estado_importacao(request: HttpRequest) -> JsonResponse:
     if not importacao:
         return JsonResponse({'nenhuma': True})
 
+    from .importador_stampdata import importacao_esta_activa as _importacao_esta_activa
+
     return JsonResponse({
         'id': importacao.pk,
         'pais': importacao.pais.nome,
@@ -368,6 +382,59 @@ def vista_estado_importacao(request: HttpRequest) -> JsonResponse:
         'iniciado_em': importacao.iniciado_em.isoformat() if importacao.iniciado_em else None,
         'concluido_em': importacao.concluido_em.isoformat() if importacao.concluido_em else None,
         'a_correr': importacao.estado == ImportacaoCatalogo.ESTADO_A_CORRER,
+        'thread_activa': _importacao_esta_activa(importacao.pk),
+    })
+
+
+@login_required
+def vista_retomar_importacao(request: HttpRequest) -> JsonResponse:
+    """Retoma uma importação interrompida (thread morreu). Restrito ao administrador."""
+    if not _utilizador_e_admin(request):
+        return JsonResponse({'error': 'Acesso restrito ao administrador.'}, status=403)
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Método não permitido.'}, status=405)
+
+    importacao_id_raw = request.POST.get('importacao_id', '').strip()
+    if not importacao_id_raw:
+        return JsonResponse({'error': 'importacao_id é obrigatório.'}, status=400)
+
+    try:
+        importacao = ImportacaoCatalogo.objects.select_related('pais').get(
+            pk=int(importacao_id_raw)
+        )
+    except (ImportacaoCatalogo.DoesNotExist, ValueError):
+        return JsonResponse({'error': 'Importação não encontrada.'}, status=404)
+
+    if importacao.estado == ImportacaoCatalogo.ESTADO_CONCLUIDO:
+        return JsonResponse({'error': 'A importação já está concluída.'}, status=400)
+
+    from .importador_stampdata import executar_importacao, importacao_esta_activa
+
+    if importacao_esta_activa(importacao.pk):
+        return JsonResponse({
+            'error': 'Esta importação já está a correr.',
+            'importacao_id': importacao.pk,
+        }, status=409)
+
+    # Reativar o estado para "a_correr" (pode estar em "erro" se foi marcado como tal)
+    importacao.estado = ImportacaoCatalogo.ESTADO_A_CORRER
+    importacao.fase_atual = 'A retomar…'
+    importacao.mensagem_erro = ''
+    importacao.save(update_fields=['estado', 'fase_atual', 'mensagem_erro'])
+
+    t = threading.Thread(
+        target=executar_importacao,
+        args=(importacao.pk,),
+        daemon=True,
+        name=f'importacao-{importacao.pk}',
+    )
+    t.start()
+
+    return JsonResponse({
+        'importacao_id': importacao.pk,
+        'pais': importacao.pais.nome,
+        'estado': importacao.estado,
+        'retomada': True,
     })
 
 

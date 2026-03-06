@@ -194,6 +194,13 @@
                         <div id="importar-erro-fatal" class="alert alert-danger mt-2 d-none" style="font-size:.82rem;padding:.5rem .75rem;">
                             <i class="bi bi-exclamation-triangle me-1"></i><span id="importar-erro-fatal-msg"></span>
                         </div>
+                        <div id="importar-parado" class="alert alert-warning mt-2 d-none" style="font-size:.82rem;padding:.5rem .75rem;">
+                            <i class="bi bi-pause-circle me-1"></i>
+                            Importação interrompida (ligação perdida durante o processo).
+                            <button type="button" class="btn btn-sm btn-warning ms-2" id="btn-retomar-importacao">
+                                <i class="bi bi-play-circle me-1"></i>Retomar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -673,7 +680,15 @@ async function _actualizarProgresso(importacaoId) {
         document.getElementById('imp-imgs').textContent =
             d.imagens_processadas + '/' + (d.imagens_total || '?');
 
-        if (d.estado === 'concluido') {
+        if (d.a_correr && !d.thread_activa) {
+            // Thread morreu (ex: ligação perdida) — mostrar botão de retomar
+            clearInterval(_pollingInterval);
+            barra.classList.remove('progress-bar-animated', 'progress-bar-striped');
+            document.getElementById('importar-parado').classList.remove('d-none');
+            document.getElementById('btn-importar-stampdata').disabled = false;
+            document.getElementById('btn-importar-stampdata').innerHTML =
+                '<i class="bi bi-cloud-download me-1"></i>Importar do StampData';
+        } else if (d.estado === 'concluido') {
             clearInterval(_pollingInterval);
             barra.classList.remove('progress-bar-animated', 'progress-bar-striped');
             barra.classList.add('bg-success');
@@ -752,9 +767,65 @@ document.getElementById('modal-criar-pais').addEventListener('show.bs.modal', as
         if (!resp.ok) return;
         const d = await resp.json();
         if (d.a_correr && d.id) {
-            iniciarPollingImportacao(d.id);
+            if (d.thread_activa) {
+                iniciarPollingImportacao(d.id);
+            } else {
+                // Thread morreu — mostrar estado parado imediatamente
+                _importacaoId = d.id;
+                document.getElementById('importar-progresso').classList.remove('d-none');
+                document.getElementById('importar-parado').classList.remove('d-none');
+                document.getElementById('importar-fase').textContent = d.fase_atual || '…';
+                document.getElementById('importar-pct-label').textContent = d.progresso_pct + '%';
+                const barra = document.getElementById('importar-barra');
+                barra.style.width = d.progresso_pct + '%';
+                barra.classList.remove('progress-bar-animated', 'progress-bar-striped');
+                document.getElementById('imp-selos-criados').textContent = d.selos_criados;
+                document.getElementById('imp-selos-atualizados').textContent = d.selos_atualizados;
+                document.getElementById('imp-imgs').textContent =
+                    d.imagens_processadas + '/' + (d.imagens_total || '?');
+            }
         }
     } catch (_) {}
+});
+
+document.getElementById('btn-retomar-importacao').addEventListener('click', async () => {
+    if (!_importacaoId) return;
+    const csrfToken = document.querySelector('#form-criar-pais [name=csrfmiddlewaretoken]').value;
+    document.getElementById('importar-parado').classList.add('d-none');
+    const barra = document.getElementById('importar-barra');
+    barra.classList.add('progress-bar-animated', 'progress-bar-striped');
+    barra.classList.remove('bg-danger');
+    document.getElementById('importar-concluido').classList.add('d-none');
+    document.getElementById('importar-erro-fatal').classList.add('d-none');
+    document.getElementById('btn-importar-stampdata').disabled = true;
+    document.getElementById('btn-importar-stampdata').innerHTML =
+        '<span class="spinner-border spinner-border-sm me-1"></span>A retomar…';
+    try {
+        const resp = await fetch('{% url "catalog:retomar_importacao" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrfToken,
+            },
+            body: new URLSearchParams({ importacao_id: _importacaoId }),
+        });
+        const data = await resp.json();
+        if (data.error) {
+            document.getElementById('importar-erro').textContent = data.error;
+            document.getElementById('importar-erro').classList.remove('d-none');
+            document.getElementById('btn-importar-stampdata').disabled = false;
+            document.getElementById('btn-importar-stampdata').innerHTML =
+                '<i class="bi bi-cloud-download me-1"></i>Importar do StampData';
+            return;
+        }
+        iniciarPollingImportacao(data.importacao_id);
+    } catch (err) {
+        document.getElementById('importar-erro').textContent = 'Erro ao retomar importação. Tente novamente.';
+        document.getElementById('importar-erro').classList.remove('d-none');
+        document.getElementById('btn-importar-stampdata').disabled = false;
+        document.getElementById('btn-importar-stampdata').innerHTML =
+            '<i class="bi bi-cloud-download me-1"></i>Importar do StampData';
+    }
 });
 } // end if (USUARIO_ADMIN)
 </script>
