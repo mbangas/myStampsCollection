@@ -13,6 +13,7 @@ urlpatterns = [
     path('pais/<int:pk>/apagar/', views.vista_confirmar_apagar_pais, name='apagar_pais'),
     path('selo/<int:pk>/', views.VistaSeloDetalhe.as_view(), name='selo_detalhe'),
     path('selo/<int:pk>/upload-imagem/', views.vista_upload_imagem_selo, name='upload_imagem_selo'),
+    path('selo/<int:pk>/descarregar-imagem-stampdata/', views.vista_descarregar_imagem_stampdata, name='descarregar_imagem_stampdata'),
     path('criar-pais/', views.vista_criar_pais, name='criar_pais'),
     path('importar-stampdata/', views.vista_iniciar_importacao_stampdata, name='importar_stampdata'),
     path('importar-stampdata/estado/', views.vista_estado_importacao, name='estado_importacao'),

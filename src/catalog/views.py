@@ -466,3 +466,27 @@ def vista_confirmar_apagar_pais(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect('catalog:catalogo')
 
     return render(request, 'catalog/confirmar_apagar_pais.html', {'pais': pais})
+
+
+@login_required
+def vista_descarregar_imagem_stampdata(request: HttpRequest, pk: int) -> HttpResponse:
+    """Re-descarrega a imagem de um selo do StampData. Restrito ao administrador."""
+    if not _utilizador_e_admin(request):
+        messages.error(request, 'Acesso restrito ao administrador.')
+        return redirect('catalog:selo_detalhe', pk=pk)
+
+    if request.method != 'POST':
+        return redirect('catalog:selo_detalhe', pk=pk)
+
+    selo = get_object_or_404(Selo, pk=pk)
+
+    from .importador_stampdata import descarregar_imagem_para_selo
+
+    sucesso, mensagem = descarregar_imagem_para_selo(selo)
+
+    if sucesso:
+        messages.success(request, mensagem)
+    else:
+        messages.error(request, mensagem)
+
+    return redirect('catalog:selo_detalhe', pk=pk)

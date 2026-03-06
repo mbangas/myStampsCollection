@@ -576,6 +576,68 @@ def _baixar_e_guardar_imagem(
         return False
 
 
+def descarregar_imagem_para_selo(selo: 'Selo') -> tuple[bool, str]:
+    """Descarrega e guarda a imagem de um selo a partir do StampData.
+
+    Faz sempre um scrape fresco da página, ignorando a cache da URL de imagem,
+    para garantir que selos sem imagem são tentados de novo.
+    Devolve (sucesso, mensagem).
+    """
+    importacao = ImportacaoCatalogo.objects.filter(pais=selo.pais).order_by('-iniciado_em').first()
+    if not importacao:
+        return False, 'Não existe registo de importação StampData para este país.'
+
+    issuer_id = importacao.issuer_id
+    stamp_id = _obter_stamp_id_de_numero(selo.numero_catalogo, issuer_id)
+    if not stamp_id:
+        return False, (
+            f'Não foi possível determinar o ID StampData '
+            f'para o número de catálogo "{selo.numero_catalogo}".'
+        )
+
+    # Scrape fresco da página do StampData (ignora a flag imagem_url_scraped)
+    page_url = f"{BASE_URL}/stamp.php?id={stamp_id}"
+    imagem_url: Optional[str] = None
+    try:
+        resp = requests.get(page_url, headers=HEADERS, timeout=30)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        imagem_url = _extrair_url_imagem(soup, stamp_id, page_url)
+    except requests.RequestException as exc:
+        logger.warning("Erro HTTP ao obter imagem stamp_id=%d: %s", stamp_id, exc)
+        return False, f'Erro ao aceder ao StampData: {exc}'
+
+    # Actualiza a cache com a URL obtida
+    cache_path = _caminho_cache_detalhe(issuer_id, stamp_id)
+    if cache_path.exists():
+        try:
+            with open(cache_path, encoding="utf-8") as f:
+                dados = json.load(f)
+            dados["imagem_url"] = imagem_url
+            dados["imagem_url_scraped"] = True
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(dados, f, ensure_ascii=False, indent=2)
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    if not imagem_url:
+        return False, 'Não foi encontrada imagem para este selo no StampData.'
+
+    img_bytes = _descarregar_bytes(imagem_url)
+    if not img_bytes:
+        return False, 'Erro ao descarregar os bytes da imagem do StampData.'
+
+    ext = imagem_url.rsplit(".", 1)[-1].split("?")[0].lower()
+    if ext not in ("jpg", "jpeg", "png"):
+        ext = "jpg"
+    filename = f"{issuer_id}_{stamp_id}.{ext}"
+
+    if selo.imagem:
+        selo.imagem.delete(save=False)
+    selo.imagem.save(filename, ContentFile(img_bytes), save=True)
+    return True, 'Imagem descarregada com sucesso do StampData.'
+
+
 def executar_importacao(importacao_id: int) -> None:
     """Função principal a ser executada numa thread em background.
 
