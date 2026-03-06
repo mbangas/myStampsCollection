@@ -57,6 +57,80 @@
 .mapa-zoom-controls button:hover {
     background: #21262d;
 }
+/* ── Tabs de navegação ────────────────────────────────────────── */
+.catalogo-tabs {
+    border-bottom: 1px solid #30363d;
+    margin-bottom: 1.25rem;
+}
+.catalogo-tabs .nav-link {
+    color: #8b949e;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: .5rem 1.25rem;
+    background: transparent;
+    transition: color .15s;
+}
+.catalogo-tabs .nav-link:hover {
+    color: #e6edf3;
+    border-bottom-color: #30363d;
+}
+.catalogo-tabs .nav-link.active {
+    color: #58a6ff;
+    border-bottom: 2px solid #58a6ff;
+    background: transparent;
+}
+/* ── Índice Alfabético ──────────────────────────────────────── */
+.indice-letras {
+    font-size: .88rem;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: .75rem;
+    margin-bottom: 1.5rem;
+    line-height: 2.2;
+}
+.indice-letras a {
+    color: #58a6ff;
+    text-decoration: none;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-weight: 600;
+    margin: 0 1px;
+}
+.indice-letras a:hover { background: rgba(31,111,235,.2); }
+.indice-grid {
+    columns: 4 200px;
+    column-gap: 2rem;
+}
+.indice-secao {
+    break-inside: avoid;
+    margin-bottom: 1.5rem;
+}
+.indice-letra-header {
+    color: #58a6ff;
+    font-weight: 700;
+    font-size: 1rem;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: .2rem;
+    margin-bottom: .4rem;
+}
+.indice-link {
+    color: #e6edf3;
+    text-decoration: none;
+    font-size: .85rem;
+    display: block;
+    padding: 1px 0;
+    line-height: 1.6;
+}
+.indice-link:hover { color: #58a6ff; }
+.indice-link.sem-selos {
+    color: #8b949e;
+    font-style: italic;
+}
+.indice-link.sem-catalogo {
+    color: #484f58;
+    cursor: default;
+    pointer-events: none;
+}
 /* ── Map popup (click) ─────────────────────────────────── */
 .mapa-popup {
     position: fixed;
@@ -95,6 +169,31 @@
         <i class="bi bi-lightning me-1"></i> Ver Matches de Troca
     </a>
 </div>
+
+<!-- Navegação em abas -->
+<ul class="nav catalogo-tabs" id="catalogo-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-mapa-btn"
+                data-bs-toggle="tab" data-bs-target="#tab-mapa"
+                type="button" role="tab"
+                aria-controls="tab-mapa" aria-selected="true">
+            <i class="bi bi-globe2 me-1"></i>Mapa
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-indice-btn"
+                data-bs-toggle="tab" data-bs-target="#tab-indice"
+                type="button" role="tab"
+                aria-controls="tab-indice" aria-selected="false">
+            <i class="bi bi-list-columns me-1"></i>Índice
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+<!-- ═══ Tab 1: Mapa ════════════════════════════════════════════ -->
+<div class="tab-pane fade show active" id="tab-mapa" role="tabpanel" aria-labelledby="tab-mapa-btn">
 
 <!-- Mapa do mundo -->
 <div id="mapa-mundo">
@@ -274,6 +373,15 @@
     {% endfor %}
 </div>
 
+</div><!-- /tab-mapa -->
+
+<!-- ═══ Tab 2: Índice Alfabético ═══════════════════════════════ -->
+<div class="tab-pane fade" id="tab-indice" role="tabpanel" aria-labelledby="tab-indice-btn">
+    <div id="indice-paises"></div>
+</div><!-- /tab-indice -->
+
+</div><!-- /tab-content -->
+
 <!-- Dados do servidor para o mapa -->
 <script>
     const PAISES_DATA = {{ paises_json|safe }};
@@ -312,6 +420,8 @@ if (inputPesquisa) {
 }
 
 /* ═══ Mapa Mundial D3 (com zoom, hover e criação de catálogo) ═══ */
+let _worldCountriesData = null; // partilhado com o índice
+
 (async function buildMap() {
     const [worldData, isoData] = await Promise.all([
         d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
@@ -321,6 +431,8 @@ if (inputPesquisa) {
     /* ── Mapeamento numérico ↔ ISO / nomes ────────────────────── */
     const numericByAlpha2 = {}, numericByAlpha3 = {};
     const infoByNumeric = {};
+
+    _worldCountriesData = Array.isArray(isoData) ? isoData : [];
 
     if (Array.isArray(isoData)) {
         isoData.forEach(c => {
@@ -828,5 +940,128 @@ document.getElementById('btn-retomar-importacao').addEventListener('click', asyn
     }
 });
 } // end if (USUARIO_ADMIN)
+
+/* ═══ Índice Alfabético ════════════════════════════════════════ */
+(function () {
+    let _built = false;
+
+    function normAlpha(s) {
+        return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    }
+
+    async function buildIndex() {
+        if (_built) return;
+        _built = true;
+
+        const container = document.getElementById('indice-paises');
+        if (!container) return;
+
+        container.innerHTML = '<p class="text-muted" id="indice-loading"><span class="spinner-border spinner-border-sm me-2"></span>A carregar…</p>';
+
+        // Se o mapa ainda não carregou os dados, busca agora
+        if (!_worldCountriesData) {
+            _worldCountriesData = await fetch(
+                'https://cdn.jsdelivr.net/npm/world-countries@4.0.0/countries.json'
+            ).then(r => r.json()).catch(() => []);
+        }
+
+        // Índice de lookup por ISO do catálogo
+        const catalogByIso2 = {};
+        const catalogByIso3 = {};
+        PAISES_DATA.forEach(p => {
+            const code = p.iso.toUpperCase();
+            if (code.length <= 2) catalogByIso2[code] = p;
+            else catalogByIso3[code] = p;
+        });
+
+        const allCountries = [];
+        const seenIso2 = new Set();
+
+        // Todos os países do mundo (world-countries dataset)
+        (_worldCountriesData || []).forEach(c => {
+            const iso2 = (c.cca2 || '').toUpperCase();
+            const iso3 = (c.cca3 || '').toUpperCase();
+
+            // Nome em PT quando disponível, senão inglês
+            const nome = c.name?.translations?.por?.common
+                || c.name?.translations?.por?.official
+                || c.name?.common
+                || c.name?.official
+                || '';
+            if (!nome) return;
+
+            const catalogEntry = catalogByIso2[iso2] || catalogByIso3[iso3] || null;
+            if (iso2) seenIso2.add(iso2);
+
+            allCountries.push({
+                nome: catalogEntry ? catalogEntry.nome : nome,
+                url: catalogEntry ? catalogEntry.url : null,
+                count: catalogEntry ? catalogEntry.count : 0,
+                inCatalog: !!catalogEntry,
+            });
+        });
+
+        // Entradas do catálogo não encontradas nos dados mundiais (territórios históricos, etc.)
+        PAISES_DATA.forEach(p => {
+            const code = p.iso.toUpperCase();
+            const alreadyAdded = code.length <= 2
+                ? seenIso2.has(code)
+                : allCountries.some(c => c.inCatalog && c.nome === p.nome);
+            if (!alreadyAdded) {
+                allCountries.push({ nome: p.nome, url: p.url, count: p.count, inCatalog: true });
+            }
+        });
+
+        // Ordenar e agrupar por letra
+        const sorted = allCountries.sort((a, b) =>
+            a.nome.localeCompare(b.nome, 'pt', { sensitivity: 'base' })
+        );
+
+        const grouped = {};
+        sorted.forEach(p => {
+            const letter = normAlpha(p.nome[0]);
+            if (!grouped[letter]) grouped[letter] = [];
+            grouped[letter].push(p);
+        });
+
+        const letters = Object.keys(grouped).sort();
+
+        // Barra de salto por letra
+        let html = '<div class="indice-letras"><span class="me-2 text-muted">Ir para:</span>';
+        letters.forEach(l => {
+            html += `<a href="#indice-letra-${l}">${l}</a>`;
+        });
+        html += '</div>';
+
+        // Grelha multi-coluna com secções por letra
+        html += '<div class="indice-grid">';
+        letters.forEach(l => {
+            html += `<div class="indice-secao" id="indice-letra-${l}">`;
+            html += `<div class="indice-letra-header">${l}</div>`;
+            grouped[l].forEach(p => {
+                if (p.inCatalog && p.url) {
+                    const countHtml = p.count > 0
+                        ? ` <small class="text-muted" style="font-size:.72rem;">${p.count}</small>`
+                        : '';
+                    html += `<a href="${p.url}" class="indice-link">${p.nome}${countHtml}</a>`;
+                } else {
+                    html += `<span class="indice-link sem-catalogo">${p.nome}</span>`;
+                }
+            });
+            html += '</div>';
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+    }
+
+    const tabBtn = document.getElementById('tab-indice-btn');
+    if (tabBtn) {
+        tabBtn.addEventListener('shown.bs.tab', buildIndex);
+    }
+    if (window.location.hash === '#tab-indice') {
+        buildIndex();
+    }
+})();
 </script>
 {% endblock %}
