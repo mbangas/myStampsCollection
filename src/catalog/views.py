@@ -125,6 +125,18 @@ class VistaPais(DetailView):
             .values_list('stamp_id', flat=True)
         )
 
+        # Ano anterior e seguinte na lista de anos disponíveis
+        ano_anterior = ano_seguinte = None
+        if ano and anos_disponiveis:
+            try:
+                idx = anos_disponiveis.index(int(ano))
+                if idx > 0:
+                    ano_anterior = anos_disponiveis[idx - 1]
+                if idx < len(anos_disponiveis) - 1:
+                    ano_seguinte = anos_disponiveis[idx + 1]
+            except (ValueError, IndexError):
+                pass
+
         context['selos']              = pagina
         context['pagina']             = pagina
         context['ids_colecao']        = ids_colecao
@@ -133,6 +145,8 @@ class VistaPais(DetailView):
         context['pesquisa']           = pesquisa
         context['tema_selecionado']   = tema_id
         context['ano_selecionado']    = ano
+        context['ano_anterior']       = ano_anterior
+        context['ano_seguinte']       = ano_seguinte
         return context
 
 

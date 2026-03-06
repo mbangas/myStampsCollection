@@ -95,12 +95,12 @@
                    onchange="document.getElementById('form-upload-imagem').submit()">
         </form>
 
-        {% if user.perfil.is_admin %}
-        <!-- Botão para re-descarregar imagem do StampData (só admin) -->
+        {% if user.perfil.is_admin and not selo.imagem %}
+        <!-- Botão para descarregar imagem do StampData (só admin, só quando não há imagem) -->
         <form method="post" action="{% url 'catalog:descarregar_imagem_stampdata' selo.pk %}" class="mt-1">
             {% csrf_token %}
             <button type="submit" class="btn btn-outline-warning btn-sm w-100"
-                    title="Re-descarrega a imagem do StampData (útil quando não existe imagem)">
+                    title="Descarrega a imagem do StampData">
                 <i class="bi bi-cloud-download me-1"></i>Descarregar do StampData
             </button>
         </form>

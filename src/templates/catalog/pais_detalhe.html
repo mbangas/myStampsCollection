@@ -305,6 +305,29 @@
     {% endif %}
 </p>
 
+<!-- Navegação de ano (topo) -->
+{% if ano_selecionado and ano_anterior or ano_selecionado and ano_seguinte %}
+<div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+    {% if ano_anterior %}
+    <a href="?ano={{ ano_anterior }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
+       class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-chevron-left me-1"></i>{{ ano_anterior }}
+    </a>
+    {% else %}
+    <span></span>
+    {% endif %}
+    <span class="text-muted small fw-semibold">{{ ano_selecionado }}</span>
+    {% if ano_seguinte %}
+    <a href="?ano={{ ano_seguinte }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
+       class="btn btn-outline-secondary btn-sm">
+        {{ ano_seguinte }}<i class="bi bi-chevron-right ms-1"></i>
+    </a>
+    {% else %}
+    <span></span>
+    {% endif %}
+</div>
+{% endif %}
+
 <!-- Layout: décadas | selos | anos -->
 <div class="pais-layout">
 
@@ -451,6 +474,29 @@
                 {% endif %}
             </ul>
         </nav>
+        {% endif %}
+
+        <!-- Navegação de ano (rodapé) -->
+        {% if ano_selecionado and ano_anterior or ano_selecionado and ano_seguinte %}
+        <div class="d-flex justify-content-between align-items-center mt-3 gap-2">
+            {% if ano_anterior %}
+            <a href="?ano={{ ano_anterior }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
+               class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-chevron-left me-1"></i>{{ ano_anterior }}
+            </a>
+            {% else %}
+            <span></span>
+            {% endif %}
+            <span class="text-muted small fw-semibold">{{ ano_selecionado }}</span>
+            {% if ano_seguinte %}
+            <a href="?ano={{ ano_seguinte }}&q={{ pesquisa }}&tema={{ tema_selecionado }}"
+               class="btn btn-outline-secondary btn-sm">
+                {{ ano_seguinte }}<i class="bi bi-chevron-right ms-1"></i>
+            </a>
+            {% else %}
+            <span></span>
+            {% endif %}
+        </div>
         {% endif %}
     </div><!-- /grelha -->
 
