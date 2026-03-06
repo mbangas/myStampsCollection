@@ -1,5 +1,7 @@
 """Vistas da aplicação Coleção."""
 
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -55,6 +57,23 @@ def vista_colecao(request: HttpRequest) -> HttpResponse:
     pagina_num = request.GET.get('pagina', 1)
     pagina = paginator.get_page(pagina_num)
 
+    # Dados do mapa: contagem de selos por país na coleção do utilizador
+    paises_mapa = (
+        Pais.objects.filter(
+            selos__itens_colecao__utilizador=request.user,
+        )
+        .annotate(num_selos_colecao=Sum('selos__itens_colecao__quantidade_possuida'))
+        .values('codigo_iso', 'nome', 'num_selos_colecao')
+    )
+    paises_mapa_json = json.dumps([
+        {
+            'iso': p['codigo_iso'],
+            'nome': p['nome'],
+            'count': p['num_selos_colecao'] or 0,
+        }
+        for p in paises_mapa
+    ])
+
     context = {
         'itens': pagina,
         'pagina': pagina,
@@ -65,6 +84,7 @@ def vista_colecao(request: HttpRequest) -> HttpResponse:
         'condicao_selecionada': condicao,
         'ano_filtro': ano,
         'condicao_choices': ItemColecao.CONDICAO_CHOICES,
+        'paises_mapa_json': paises_mapa_json,
     }
     return render(request, 'collection/colecao.html', context)
 

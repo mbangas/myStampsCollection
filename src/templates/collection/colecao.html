@@ -4,6 +4,59 @@
 
 {% block css_extra %}
 <style>
+/* ── Mapa da coleção ────────────────────────────────────────── */
+#mapa-colecao {
+    width: 100%;
+    background: #000;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 1.5rem;
+    min-height: 200px;
+}
+#mapa-colecao svg { display: block; width: 100%; }
+.mapa-tooltip-col {
+    position: fixed;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #e6edf3;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: nowrap;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,.5);
+}
+.mapa-tooltip-col strong { color: #3fb950; }
+.mapa-zoom-controls-col {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+}
+.mapa-zoom-controls-col button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #161b22;
+    color: #e6edf3;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s;
+}
+.mapa-zoom-controls-col button:hover {
+    background: #21262d;
+}
 /* ── Bulk action bar ────────────────────────────────────────── */
 #bulk-bar {
     position: fixed;
@@ -102,6 +155,17 @@ tr.selecionado { background: rgba(31,111,235,.07) !important; }
                 <div class="small" style="color:#8b949e;">Repetidos</div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Mapa da coleção -->
+<div id="mapa-colecao">
+    <svg id="svg-mapa-col"></svg>
+    <div class="mapa-tooltip-col" id="mapa-tooltip-col"></div>
+    <div class="mapa-zoom-controls-col">
+        <button id="btn-zoom-in-col" title="Zoom in"><i class="bi bi-plus-lg"></i></button>
+        <button id="btn-zoom-out-col" title="Zoom out"><i class="bi bi-dash-lg"></i></button>
+        <button id="btn-zoom-reset-col" title="Reset"><i class="bi bi-arrows-fullscreen"></i></button>
     </div>
 </div>
 
@@ -346,5 +410,153 @@ function selecionarGrupo(btn) {
     btn.textContent = todasSelecionadas ? 'Selecionar todos' : 'Desselecionar todos';
     atualizarSelecao();
 }
+</script>
+
+<!-- Dados do mapa da coleção -->
+<script>
+    const PAISES_COLECAO = {{ paises_mapa_json|safe }};
+</script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script>
+/* ═══ Mapa da Coleção D3 ═══════════════════════════════════════ */
+(async function buildMapaColecao() {
+    const [worldData, isoData] = await Promise.all([
+        d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'),
+        d3.json('https://cdn.jsdelivr.net/npm/world-countries@4.0.0/countries.json').catch(() => []),
+    ]);
+
+    /* Mapeamento numérico ↔ ISO / nomes */
+    const numericByAlpha2 = {}, numericByAlpha3 = {};
+    const infoByNumeric = {};
+
+    if (Array.isArray(isoData)) {
+        isoData.forEach(c => {
+            if (c.cca2 && c.ccn3) numericByAlpha2[c.cca2.toUpperCase()] = +c.ccn3;
+            if (c.cca3 && c.ccn3) numericByAlpha3[c.cca3.toUpperCase()] = +c.ccn3;
+            if (c.ccn3) {
+                infoByNumeric[+c.ccn3] = {
+                    nome: c.name?.common || c.name?.official || '',
+                    iso2: (c.cca2 || '').toUpperCase(),
+                    iso3: (c.cca3 || '').toUpperCase(),
+                };
+            }
+        });
+    }
+
+    const byNumeric = {};
+    PAISES_COLECAO.forEach(p => {
+        const code = p.iso.toUpperCase();
+        const num = code.length === 2
+            ? numericByAlpha2[code]
+            : numericByAlpha3[code];
+        if (num) byNumeric[num] = p;
+    });
+
+    const countries = topojson.feature(worldData, worldData.objects.countries);
+
+    /* SVG + projeção */
+    const container = document.getElementById('svg-mapa-col');
+    const W = container.parentElement.offsetWidth || 900;
+    const H = Math.round(W * 0.46);
+
+    const svg = d3.select('#svg-mapa-col')
+        .attr('viewBox', `0 0 ${W} ${H}`)
+        .attr('width', W)
+        .attr('height', H)
+        .style('background', '#000');
+
+    const projection = d3.geoNaturalEarth1()
+        .scale(W / 6.3)
+        .translate([W / 2, H / 2]);
+
+    const geoPath = d3.geoPath().projection(projection);
+
+    const maxCount = d3.max(PAISES_COLECAO, d => d.count) || 1;
+    const colorScale = d3.scaleSequentialSqrt()
+        .domain([1, maxCount])
+        .interpolator(d3.interpolateGreens);
+
+    /* Grupo principal (zoom aplica-se aqui) */
+    const g = svg.append('g');
+
+    g.append('path')
+        .datum(d3.geoGraticule()())
+        .attr('d', geoPath)
+        .attr('fill', 'none')
+        .attr('stroke', '#111')
+        .attr('stroke-width', 0.4);
+
+    const tooltip = document.getElementById('mapa-tooltip-col');
+
+    /* Países */
+    g.append('g')
+        .selectAll('path')
+        .data(countries.features)
+        .join('path')
+        .attr('d', geoPath)
+        .attr('fill', d => {
+            const p = byNumeric[+d.id];
+            return (p && p.count > 0) ? colorScale(p.count) : '#1a1a1a';
+        })
+        .attr('stroke', '#ffffff')
+        .attr('stroke-width', 0.25)
+        .attr('stroke-opacity', 0.4)
+        .style('cursor', 'pointer')
+        .on('mousemove', function(event, d) {
+            const p    = byNumeric[+d.id];
+            const info = infoByNumeric[+d.id];
+            const nome = p ? p.nome : (info ? info.nome : null);
+            if (!nome) return;
+
+            tooltip.style.display = 'block';
+            tooltip.style.left    = (event.clientX + 14) + 'px';
+            tooltip.style.top     = (event.clientY - 40) + 'px';
+
+            if (p && p.count > 0) {
+                tooltip.innerHTML = `<strong>${p.nome}</strong><br>`
+                    + `<span style="color:#8b949e">${p.count} selo${p.count !== 1 ? 's' : ''} na coleção</span>`;
+            } else {
+                tooltip.innerHTML = `<strong>${nome}</strong><br>`
+                    + `<span style="color:#8b949e">Nenhum selo na coleção</span>`;
+            }
+
+            d3.select(this)
+                .attr('stroke', '#3fb950')
+                .attr('stroke-width', 1.2)
+                .attr('stroke-opacity', 1);
+        })
+        .on('mouseleave', function() {
+            tooltip.style.display = 'none';
+            d3.select(this)
+                .attr('stroke', '#ffffff')
+                .attr('stroke-width', 0.25)
+                .attr('stroke-opacity', 0.4);
+        });
+
+    /* Zoom & Pan */
+    const zoom = d3.zoom()
+        .scaleExtent([1, 12])
+        .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+        });
+
+    svg.call(zoom);
+    svg.on('dblclick.zoom', null);
+
+    document.getElementById('btn-zoom-in-col').addEventListener('click', () => {
+        svg.transition().duration(300).call(zoom.scaleBy, 1.5);
+    });
+    document.getElementById('btn-zoom-out-col').addEventListener('click', () => {
+        svg.transition().duration(300).call(zoom.scaleBy, 1 / 1.5);
+    });
+    document.getElementById('btn-zoom-reset-col').addEventListener('click', () => {
+        svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
+    });
+
+})().catch(err => {
+    console.warn('Mapa da coleção não carregado:', err);
+    document.getElementById('mapa-colecao').style.display = 'none';
+});
 </script>
 {% endblock %}
