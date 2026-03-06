@@ -1,6 +1,8 @@
-# 📮 myStampsCollection — Guia de Instalação
+# 📮 myStampsCollection — Guia de Instalação e Actualização
 
 > **Para toda a gente** — Este guia foi escrito para qualquer pessoa, mesmo sem conhecimentos técnicos. Siga os passos na ordem indicada e a aplicação ficará pronta a usar.
+>
+> **Instalador Inteligente v3.0** — Detecta automaticamente se deve fazer uma instalação nova ou actualização.
 
 ---
 
@@ -12,15 +14,28 @@ O **myStampsCollection** é uma plataforma web open source para colecionadores d
 
 ## O que o instalador faz?
 
-O instalador executa automaticamente, sem necessidade de saber programar:
+O instalador inteligente detecta automaticamente o cenário e actua de acordo:
+
+### Instalação nova (1ª vez)
 
 | Passo | O que acontece |
 |-------|---------------|
 | **1** | Actualiza o sistema operativo (instala as últimas actualizações de segurança) |
 | **2** | Instala o **Docker** — o motor que executa a aplicação em contentores isolados |
-| **3** | Descarrega o código do **myStampsCollection** do GitHub |
-| **4** | Cria o ficheiro de configuração (`.env`) com as credenciais fornecidas |
-| **5** | Compila e inicia todos os serviços (Django, PostgreSQL, Nginx) |
+| **3** | Configura Docker para o ambiente (inclui self-healing para Proxmox LXC) |
+| **4** | Descarrega o código do **myStampsCollection** do GitHub |
+| **5** | Cria o ficheiro de configuração (`.env`) com as credenciais fornecidas |
+| **6** | Compila e inicia todos os serviços (Django, PostgreSQL, Nginx) |
+| **7** | Verifica a saúde da aplicação (contentores, HTTP, disco) |
+
+### Actualização (instalação existente detectada)
+
+| Passo | O que acontece |
+|-------|---------------|
+| **1** | Actualiza o código do GitHub (git pull) |
+| **2** | Reconstrói as imagens Docker |
+| **3** | Reinicia todos os serviços |
+| **4** | Verifica a saúde da aplicação |
 
 ---
 
@@ -79,23 +94,26 @@ ssh root@<IP-do-LXC>
 
 ---
 
-### 2. Descarregar o instalador
+### 2. Descarregar e executar o instalador
 
-Execute este comando para descarregar o instalador directamente do GitHub:
+Execute este comando para descarregar e executar o instalador:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mbangas/myStampsCollection/master/setup/install.sh -o install.sh
-```
-
----
-
-### 3. Executar o instalador
-
-```bash
 sudo bash install.sh
 ```
 
 > Se já estiver como `root`, basta `bash install.sh`.
+
+#### Opções da linha de comando
+
+| Opção | Descrição |
+|-------|----------|
+| `--install`, `-i` | Forçar modo instalação (mesmo se já existir) |
+| `--update`, `-u` | Forçar modo actualização |
+| `--dir <path>` | Directório de instalação (default: `/opt/mystamps`) |
+| `--port <port>` | Porta da aplicação (default: `80`) |
+| `--help`, `-h` | Mostrar ajuda |
 
 ---
 
@@ -123,9 +141,15 @@ Introduza uma password segura para a base de dados PostgreSQL.
 > ⚠️ **Importante:** Use uma password forte (mínimo 8 caracteres). Esta password é guardada no ficheiro `.env` dentro do directório de instalação.
 
 #### Ecrã 6 — Barra de Progresso
-O instalador executa todos os passos automaticamente mostrando o progresso em tempo real. **Não é necessário fazer nada** — aguarde até a barra chegar a 100%.
+O instalador executa todos os passos automaticamente mostrando o progresso em tempo real com:
 
-O instalador v2.0 inclui **self-healing automático**: se detectar problemas com o Docker em Proxmox LXC (sysctl, storage driver, nesting), tenta corrigir automaticamente sem intervenção.
+- **Barra de progresso colorida** com percentagem e tempo decorrido
+- **Spinners animados** em cada sub-tarefa
+- **Indicadores visuais** com cores: ✅ sucesso, ⚠️ aviso, 🔧 self-heal
+
+**Não é necessário fazer nada** — aguarde até a barra chegar a 100%.
+
+O instalador v3.0 inclui **self-healing automático**: se detectar problemas com o Docker em Proxmox LXC (sysctl, storage driver, nesting), tenta corrigir automaticamente sem intervenção.
 
 > ⏱️ A instalação demora tipicamente **5 a 15 minutos** dependendo da velocidade da ligação à Internet.
 
@@ -210,8 +234,9 @@ docker compose -f /opt/mystamps/docker-compose.yml down
 # Reiniciar todos os serviços
 docker compose -f /opt/mystamps/docker-compose.yml restart
 
-# Actualizar para a versão mais recente
+# Actualizar para a versão mais recente (qualquer uma das formas)
 mystamps-update
+mystamps-setup --update
 
 # Ver o estado dos contentores
 docker ps
@@ -322,12 +347,14 @@ O contentor Django ainda está a iniciar. Aguarde e tente novamente.
 ### Preciso de reinstalar
 
 ```bash
-# Parar e remover os contentores (os volumes de dados NAO sao apagados)
+# Parar e remover os contentores (os volumes de dados NÃO são apagados)
 docker compose -f /opt/mystamps/docker-compose.yml down
 docker rmi $(docker images | grep mystamps | awk '{print $3}') 2>/dev/null || true
 
-# Re-executar o instalador
+# Re-executar o instalador (idempotente — pode correr quantas vezes quiser)
 sudo bash install.sh
+# ou
+mystamps-setup --install
 ```
 
 ---
@@ -367,7 +394,7 @@ Volumes Docker geridos automaticamente:
 
 | Componente | Versão | Porta |
 |-----------|--------|-------|
-| **myStampsCollection** | 1.0 | 80 |
+| **myStampsCollection** | 1.0 (instalador v3.0) | 80 |
 | **Django** | 5.0 | — |
 | **Python** (dentro do Docker) | 3.12 | — |
 | **PostgreSQL** | 16 Alpine | 5432 (interno) |
