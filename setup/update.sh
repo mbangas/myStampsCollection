@@ -44,7 +44,10 @@ echo "  --> A descarregar actualizacoes do GitHub..."
 git -C "$APP_DIR" pull
 
 echo "  --> A reconstruir imagens Docker..."
-docker compose -f "$APP_DIR/docker-compose.yml" build
+# --pull=never utiliza a imagem base em cache local, evitando falhas de rede
+# com o Docker Hub quando a imagem já existe. Para forçar a actualização da
+# imagem base, corra: docker pull python:3.12-slim   antes deste script.
+docker compose -f "$APP_DIR/docker-compose.yml" build --pull=never
 
 echo "  --> A reiniciar servicos..."
 docker compose -f "$APP_DIR/docker-compose.yml" up -d

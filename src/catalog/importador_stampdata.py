@@ -7,8 +7,10 @@ Corre numa thread em background e actualiza ImportacaoCatalogo com o progresso.
 import json
 import logging
 import re
+import threading
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -29,6 +31,8 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://www.stampdata.com"
 PAGE_SIZE = 50
 REQUEST_DELAY = 1.5
+MAX_WORKERS_SCRAPE = 5
+MAX_WORKERS_IMAGENS = 10
 
 HEADERS = {
     "User-Agent": (
@@ -511,6 +515,56 @@ def _obter_stamp_id_de_numero(numero_catalogo: str, issuer_id: int) -> Optional[
 
 # ─── Função principal de importação ─────────────────────────────────────────────
 
+def _scrape_com_delay(issuer_id: int, stamp_id: int) -> Optional[dict]:
+    """Faz scrape de um selo com throttle quando o resultado não está em cache."""
+    em_cache = _caminho_cache_detalhe(issuer_id, stamp_id).exists()
+    resultado = _scrape_detalhe_selo(issuer_id, stamp_id)
+    if not em_cache:
+        time.sleep(REQUEST_DELAY)
+    return resultado
+
+
+def _baixar_e_guardar_imagem(
+    selo_pk: int,
+    numero_catalogo: str,
+    stamp_id: int,
+    issuer_id: int,
+    session: requests.Session,
+) -> bool:
+    """Descarrega e guarda a imagem de um selo. Executado numa thread worker."""
+    close_old_connections()
+
+    imagem_url, fez_pedido = _obter_url_imagem_da_cache(issuer_id, stamp_id)
+    if fez_pedido:
+        time.sleep(1.0)
+    if not imagem_url:
+        return False
+
+    try:
+        resp = session.get(imagem_url, timeout=30)
+        resp.raise_for_status()
+        if "image" not in resp.headers.get("content-type", ""):
+            return False
+        img_bytes = resp.content
+    except requests.RequestException as exc:
+        logger.warning("Erro ao descarregar imagem %s: %s", imagem_url, exc)
+        return False
+
+    ext = imagem_url.rsplit(".", 1)[-1].split("?")[0].lower()
+    if ext not in ("jpg", "jpeg", "png"):
+        ext = "jpg"
+    filename = f"{issuer_id}_{stamp_id}.{ext}"
+
+    try:
+        close_old_connections()
+        selo = Selo.objects.get(pk=selo_pk)
+        selo.imagem.save(filename, ContentFile(img_bytes), save=True)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Erro ao guardar imagem selo %s: %s", numero_catalogo, exc)
+        return False
+
+
 def executar_importacao(importacao_id: int) -> None:
     """Função principal a ser executada numa thread em background.
 
@@ -565,21 +619,27 @@ def executar_importacao(importacao_id: int) -> None:
         importacao.save(update_fields=["total_ids"])
         prog(f"{len(ids)} IDs encontrados. A fazer scrape dos detalhes…")
 
-        # ── Fase 2: Scrape detalhes ────────────────────────────────────────────
+        # ── Fase 2: Scrape detalhes (paralelo) ────────────────────────────────
         detalhes: list[dict] = []
-        for idx, stamp_id in enumerate(ids, 1):
-            dado = _scrape_detalhe_selo(issuer_id, stamp_id)
-            if dado:
-                detalhes.append(dado)
-            # Throttle para não sobrecarregar StampData
-            if not _caminho_cache_detalhe(issuer_id, stamp_id).exists():
-                time.sleep(REQUEST_DELAY)
+        lock_detalhes = threading.Lock()
+        processados = 0
 
-            if idx % 50 == 0 or idx == len(ids):
-                prog(
-                    f"Scrape: {idx}/{len(ids)} selos processados…",
-                    ids_processados=idx,
-                )
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS_SCRAPE) as executor:
+            futures = {
+                executor.submit(_scrape_com_delay, issuer_id, sid): sid
+                for sid in ids
+            }
+            for future in as_completed(futures):
+                dado = future.result()
+                with lock_detalhes:
+                    processados += 1
+                    if dado:
+                        detalhes.append(dado)
+                    if processados % 50 == 0 or processados == len(ids):
+                        prog(
+                            f"Scrape: {processados}/{len(ids)} selos processados…",
+                            ids_processados=processados,
+                        )
 
         prog(f"Scrape concluído. {len(detalhes)} selos obtidos. A importar para a BD…",
              ids_processados=len(ids))
@@ -662,46 +722,40 @@ def executar_importacao(importacao_id: int) -> None:
             imagens_total=total_sem_imagem,
         )
 
-        imagens_ok = 0
-        for idx, selo in enumerate(selos_sem_imagem, 1):
+        # ── Fase 4: Descarregar imagens (paralelo) ────────────────────────────
+        # Pré-calcular stamp_ids a partir do número de catálogo (apenas cache, sem HTTP)
+        tarefas_imagens: list[tuple[int, str, int]] = []
+        for selo in selos_sem_imagem:
             stamp_id = _obter_stamp_id_de_numero(selo.numero_catalogo, issuer_id)
-            if stamp_id is None:
-                if idx % 100 == 0 or idx == total_sem_imagem:
-                    prog(
-                        f"Imagens: {idx}/{total_sem_imagem}…",
-                        imagens_processadas=idx,
-                    )
-                continue
+            if stamp_id is not None:
+                tarefas_imagens.append((selo.pk, selo.numero_catalogo, stamp_id))
 
-            imagem_url, fez_pedido = _obter_url_imagem_da_cache(issuer_id, stamp_id)
-            if fez_pedido:
-                time.sleep(1.0)
+        imagens_ok = 0
+        imagens_processadas = 0
+        lock_imagens = threading.Lock()
+        session = requests.Session()
+        session.headers.update(HEADERS)
 
-            if not imagem_url:
-                if idx % 100 == 0 or idx == total_sem_imagem:
-                    prog(f"Imagens: {idx}/{total_sem_imagem}…", imagens_processadas=idx)
-                continue
-
-            img_bytes = _descarregar_bytes(imagem_url)
-            if img_bytes:
-                ext = imagem_url.rsplit(".", 1)[-1].split("?")[0].lower()
-                if ext not in ("jpg", "jpeg", "png"):
-                    ext = "jpg"
-                filename = f"{issuer_id}_{stamp_id}.{ext}"
-                try:
-                    close_old_connections()
-                    selo.imagem.save(filename, ContentFile(img_bytes), save=True)
-                    imagens_ok += 1
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Erro ao guardar imagem selo %s: %s", selo.numero_catalogo, exc)
-            else:
-                time.sleep(1.0)
-
-            if idx % 50 == 0 or idx == total_sem_imagem:
-                prog(
-                    f"Imagens: {idx}/{total_sem_imagem} ({imagens_ok} descarregadas)…",
-                    imagens_processadas=idx,
-                )
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS_IMAGENS) as executor:
+            futures = {
+                executor.submit(
+                    _baixar_e_guardar_imagem,
+                    selo_pk, num_cat, sid, issuer_id, session,
+                ): (selo_pk, num_cat, sid)
+                for selo_pk, num_cat, sid in tarefas_imagens
+            }
+            for future in as_completed(futures):
+                ok = future.result()
+                with lock_imagens:
+                    imagens_processadas += 1
+                    if ok:
+                        imagens_ok += 1
+                    if imagens_processadas % 50 == 0 or imagens_processadas == len(tarefas_imagens):
+                        prog(
+                            f"Imagens: {imagens_processadas}/{total_sem_imagem} "
+                            f"({imagens_ok} descarregadas)…",
+                            imagens_processadas=imagens_processadas,
+                        )
 
         prog(
             f"Concluído! Selos criados: {criados}, atualizados: {atualizados}, "
