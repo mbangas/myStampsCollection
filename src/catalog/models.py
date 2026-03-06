@@ -5,6 +5,12 @@ from django.db import models
 from django.utils import timezone
 
 
+def selo_imagem_upload_path(instance: 'Selo', filename: str) -> str:
+    """Gera o caminho de upload organizado por país: stamps/<ISO>/<filename>."""
+    codigo_iso = instance.pais.codigo_iso if instance.pais_id else 'OUTRO'
+    return f'stamps/{codigo_iso}/{filename}'
+
+
 class Pais(models.Model):
     """Representa um país emissor de selos."""
 
@@ -166,7 +172,7 @@ class Selo(models.Model):
         help_text='Referência no catálogo Mundifil.',
     )
     imagem = models.ImageField(
-        upload_to='selos/',
+        upload_to=selo_imagem_upload_path,
         blank=True,
         null=True,
         verbose_name='Imagem',

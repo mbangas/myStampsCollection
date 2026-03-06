@@ -36,6 +36,13 @@ python manage.py migrate --noinput
 echo "📦 A recolher ficheiros estáticos…"
 python manage.py collectstatic --noinput --clear
 
+# ── Symlink das imagens de selos organizadas por país ─────────────────────────
+# As imagens estão em images/stamps/<ISO>/ e precisam ser acessíveis via MEDIA_ROOT.
+if [ ! -e media/stamps ]; then
+    echo "🔗 A criar symlink media/stamps → images/stamps…"
+    ln -sfn ../images/stamps media/stamps
+fi
+
 # ── Catálogo: carrega fixtures (BD + imagens) se o volume estiver vazio ───────
 # Em nova infraestrutura (volumes vazios) carrega fixtures incluídas na imagem.
 # Se os volumes já tiverem dados (reinício normal) salta automaticamente.
