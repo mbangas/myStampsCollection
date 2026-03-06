@@ -128,8 +128,7 @@
 }
 .indice-link.sem-catalogo {
     color: #484f58;
-    cursor: default;
-    pointer-events: none;
+    cursor: pointer;
 }
 /* ── Map popup (click) ─────────────────────────────────── */
 .mapa-popup {
@@ -205,9 +204,6 @@
         <button id="btn-zoom-reset" title="Reset"><i class="bi bi-arrows-fullscreen"></i></button>
     </div>
 </div>
-
-<!-- Popup contextual do mapa -->
-<div class="mapa-popup" id="mapa-popup"></div>
 
 <!-- Modal para criar novo catálogo de país/zona -->
 {% if user.perfil.is_admin %}
@@ -382,6 +378,9 @@
 
 </div><!-- /tab-content -->
 
+<!-- Popup contextual (partilhado entre mapa e índice, fora dos tabs para não ser ocultado pelo Bootstrap) -->
+<div class="mapa-popup" id="mapa-popup"></div>
+
 <!-- Dados do servidor para o mapa -->
 <script>
     const PAISES_DATA = {{ paises_json|safe }};
@@ -493,7 +492,6 @@ let _worldCountriesData = null; // partilhado com o índice
         .attr('stroke-width', 0.4);
 
     const tooltip = document.getElementById('mapa-tooltip');
-    const popup   = document.getElementById('mapa-popup');
 
     /* ── Países ───────────────────────────────────────────────── */
     g.append('g')
@@ -569,76 +567,78 @@ let _worldCountriesData = null; // partilhado com o índice
         svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity);
     });
 
-    /* ── Popup contextual ─────────────────────────────────────── */
-    function showMapPopup(event, catalogData, isoInfo) {
-        const nome = catalogData ? catalogData.nome
-            : (isoInfo ? isoInfo.nome : 'País desconhecido');
-        const iso  = catalogData ? catalogData.iso
-            : (isoInfo ? (isoInfo.iso2 || isoInfo.iso3) : '');
-
-        let html = `<div class="popup-title">${nome}</div>`;
-
-        if (catalogData && catalogData.count > 0) {
-            html += `<div class="popup-info">${catalogData.count} selo${catalogData.count !== 1 ? 's' : ''} no catálogo</div>`;
-            html += `<div class="popup-actions">`;
-            html += `<a href="${catalogData.url}" class="btn btn-sm btn-primary">
-                        <i class="bi bi-eye me-1"></i>Ver Catálogo
-                     </a>`;
-            if (USUARIO_ADMIN) {
-                html += `<button class="btn btn-sm btn-outline-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="${catalogData.pk || ''}">
-                            <i class="bi bi-plus-lg me-1"></i>Criar Novo Catálogo
-                         </button>`;
-            }
-            html += `</div>`;
-        } else {
-            html += `<div class="popup-info">Sem catálogo</div>`;
-            html += `<div class="popup-actions">`;
-            if (USUARIO_ADMIN) {
-                html += `<button class="btn btn-sm btn-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="">
-                            <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
-                         </button>`;
-            }
-            html += `</div>`;
-        }
-
-        popup.innerHTML = html;
-        popup.style.display = 'block';
-        popup.style.left = (event.clientX + 10) + 'px';
-        popup.style.top  = (event.clientY + 10) + 'px';
-
-        // Ajustar se sair do ecrã
-        requestAnimationFrame(() => {
-            const r = popup.getBoundingClientRect();
-            if (r.right > window.innerWidth)
-                popup.style.left = (event.clientX - r.width - 10) + 'px';
-            if (r.bottom > window.innerHeight)
-                popup.style.top = (event.clientY - r.height - 10) + 'px';
-        });
-
-        // Ligar botão "Criar" dentro do popup
-        popup.querySelectorAll('[data-criar-nome]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                abrirModalCriarPais(btn.dataset.criarNome, btn.dataset.criarIso, btn.dataset.criarPk);
-            });
-        });
-    }
-
-    function escAttr(s) {
-        return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;');
-    }
-
-    function hideMapPopup() {
-        popup.style.display = 'none';
-    }
-
-    // Fechar popup ao clicar fora
-    document.addEventListener('click', (e) => {
-        if (!popup.contains(e.target)) hideMapPopup();
-    });
-
 })().catch(err => {
     console.warn('Mapa não carregado:', err);
     document.getElementById('mapa-mundo').style.display = 'none';
+});
+
+/* ── Popup contextual partilhado (mapa + índice) ────────────── */
+function escAttr(s) {
+    return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;');
+}
+
+function showMapPopup(event, catalogData, isoInfo) {
+    const popup = document.getElementById('mapa-popup');
+    const nome = catalogData ? catalogData.nome
+        : (isoInfo ? isoInfo.nome : 'País desconhecido');
+    const iso  = catalogData ? catalogData.iso
+        : (isoInfo ? (isoInfo.iso2 || isoInfo.iso3) : '');
+
+    let html = `<div class="popup-title">${nome}</div>`;
+
+    if (catalogData && catalogData.count > 0) {
+        html += `<div class="popup-info">${catalogData.count} selo${catalogData.count !== 1 ? 's' : ''} no catálogo</div>`;
+        html += `<div class="popup-actions">`;
+        html += `<a href="${catalogData.url}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-eye me-1"></i>Ver Catálogo
+                 </a>`;
+        if (USUARIO_ADMIN) {
+            html += `<button class="btn btn-sm btn-outline-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="${catalogData.pk || ''}">
+                        <i class="bi bi-plus-lg me-1"></i>Criar Novo Catálogo
+                     </button>`;
+        }
+        html += `</div>`;
+    } else {
+        html += `<div class="popup-info">Sem catálogo</div>`;
+        html += `<div class="popup-actions">`;
+        if (USUARIO_ADMIN) {
+            html += `<button class="btn btn-sm btn-success" data-criar-nome="${escAttr(nome)}" data-criar-iso="${escAttr(iso)}" data-criar-pk="">
+                        <i class="bi bi-plus-lg me-1"></i>Criar Catálogo
+                     </button>`;
+        }
+        html += `</div>`;
+    }
+
+    popup.innerHTML = html;
+    popup.style.display = 'block';
+    popup.style.left = (event.clientX + 10) + 'px';
+    popup.style.top  = (event.clientY + 10) + 'px';
+
+    // Ajustar se sair do ecrã
+    requestAnimationFrame(() => {
+        const r = popup.getBoundingClientRect();
+        if (r.right > window.innerWidth)
+            popup.style.left = (event.clientX - r.width - 10) + 'px';
+        if (r.bottom > window.innerHeight)
+            popup.style.top = (event.clientY - r.height - 10) + 'px';
+    });
+
+    // Ligar botão "Criar" dentro do popup
+    popup.querySelectorAll('[data-criar-nome]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            abrirModalCriarPais(btn.dataset.criarNome, btn.dataset.criarIso, btn.dataset.criarPk);
+        });
+    });
+}
+
+function hideMapPopup() {
+    document.getElementById('mapa-popup').style.display = 'none';
+}
+
+// Fechar popup ao clicar fora
+document.addEventListener('click', (e) => {
+    const popup = document.getElementById('mapa-popup');
+    if (!popup.contains(e.target)) hideMapPopup();
 });
 
 /* ═══ Modal – Criar novo catálogo (apenas administrador) ════════ */
@@ -998,6 +998,8 @@ document.getElementById('btn-retomar-importacao').addEventListener('click', asyn
                 url: catalogEntry ? catalogEntry.url : null,
                 count: catalogEntry ? catalogEntry.count : 0,
                 inCatalog: !!catalogEntry,
+                catalog: catalogEntry || null,
+                isoInfo: { nome, iso2, iso3 },
             });
         });
 
@@ -1008,7 +1010,7 @@ document.getElementById('btn-retomar-importacao').addEventListener('click', asyn
                 ? seenIso2.has(code)
                 : allCountries.some(c => c.inCatalog && c.nome === p.nome);
             if (!alreadyAdded) {
-                allCountries.push({ nome: p.nome, url: p.url, count: p.count, inCatalog: true });
+                allCountries.push({ nome: p.nome, url: p.url, count: p.count, inCatalog: true, catalog: p, isoInfo: null });
             }
         });
 
@@ -1034,18 +1036,21 @@ document.getElementById('btn-retomar-importacao').addEventListener('click', asyn
         html += '</div>';
 
         // Grelha multi-coluna com secções por letra
+        const indexData = [];
         html += '<div class="indice-grid">';
         letters.forEach(l => {
             html += `<div class="indice-secao" id="indice-letra-${l}">`;
             html += `<div class="indice-letra-header">${l}</div>`;
             grouped[l].forEach(p => {
+                const idx = indexData.length;
+                indexData.push({ catalog: p.catalog, isoInfo: p.isoInfo });
                 if (p.inCatalog && p.url) {
                     const countHtml = p.count > 0
                         ? ` <small class="text-muted" style="font-size:.72rem;">${p.count}</small>`
                         : '';
-                    html += `<a href="${p.url}" class="indice-link">${p.nome}${countHtml}</a>`;
+                    html += `<a href="${p.url}" class="indice-link" data-popup-idx="${idx}">${p.nome}${countHtml}</a>`;
                 } else {
-                    html += `<span class="indice-link sem-catalogo">${p.nome}</span>`;
+                    html += `<span class="indice-link sem-catalogo" data-popup-idx="${idx}">${p.nome}</span>`;
                 }
             });
             html += '</div>';
@@ -1053,6 +1058,16 @@ document.getElementById('btn-retomar-importacao').addEventListener('click', asyn
         html += '</div>';
 
         container.innerHTML = html;
+
+        // Ligar cliques do índice ao popup (mesmo comportamento que o mapa)
+        container.querySelectorAll('[data-popup-idx]').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const d = indexData[+el.dataset.popupIdx];
+                showMapPopup(e, d.catalog, d.isoInfo);
+            });
+        });
     }
 
     const tabBtn = document.getElementById('tab-indice-btn');
