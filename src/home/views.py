@@ -172,12 +172,13 @@ def landing_page(request: HttpRequest) -> HttpResponse:
     except Exception:
         noticias = []
 
-    # Importação de catálogo activa ou mais recente (para a caixa de progresso)
+    # Importação de catálogo activa ou com erro (concluídas não são mostradas)
     importacao_activa = (
-        ImportacaoCatalogo.objects.filter(estado=ImportacaoCatalogo.ESTADO_A_CORRER)
+        ImportacaoCatalogo.objects.filter(
+            estado__in=[ImportacaoCatalogo.ESTADO_A_CORRER, ImportacaoCatalogo.ESTADO_ERRO]
+        )
         .select_related('pais')
         .first()
-        or ImportacaoCatalogo.objects.select_related('pais').first()
     )
 
     context: dict[str, Any] = {

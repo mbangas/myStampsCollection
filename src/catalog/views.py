@@ -352,12 +352,13 @@ def vista_estado_importacao(request: HttpRequest) -> JsonResponse:
         except (ImportacaoCatalogo.DoesNotExist, ValueError):
             return JsonResponse({'error': 'Importação não encontrada.'}, status=404)
     else:
-        # Devolve a importação activa ou a mais recente
+        # Devolve a importação activa ou com erro (concluídas não são mostradas)
         importacao = (
-            ImportacaoCatalogo.objects.filter(estado=ImportacaoCatalogo.ESTADO_A_CORRER)
+            ImportacaoCatalogo.objects.filter(
+                estado__in=[ImportacaoCatalogo.ESTADO_A_CORRER, ImportacaoCatalogo.ESTADO_ERRO]
+            )
             .select_related('pais')
             .first()
-            or ImportacaoCatalogo.objects.select_related('pais').first()
         )
 
     if not importacao:
